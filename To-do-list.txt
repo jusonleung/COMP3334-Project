@@ -1,0 +1,2 @@
+two-factor authentication (using email)
+Setting a maximum number of login attempts (reactivate with email)
