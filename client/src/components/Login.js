@@ -1,15 +1,39 @@
 import React from 'react'
 import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import configData from "../config.json";
 
 const { Title } = Typography
 
-const Login: React.FC = () => {
+const Login = () => {
   const navigate = useNavigate()
   const gotoSignUpPage = () => navigate('/register')
 
-  const onFinish = (values: any) => {
-    console.log('Success:', values)
+  const onFinish = (values) => {
+    let email = values.email
+    let password = values.password
+    fetch(configData.SERVER_URL + 'login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error_message) {
+          alert(data.error_message)
+        } else {
+          //alert(data.token)
+          localStorage.setItem("token", data.token);
+          navigate('/')
+        }
+      })
+      .catch(err => console.error(err))
+    console.log('Success:', values.email, values.password)
   }
 
   return (
@@ -27,9 +51,18 @@ const Login: React.FC = () => {
         </Form.Item>
 
         <Form.Item
-          label='Username'
-          name='username'
-          rules={[{ required: true, message: 'Please input your username!' }]}
+          label='Email'
+          name='email'
+          rules={[
+            {
+              type: 'email',
+              message: 'The input is not valid Email'
+            },
+            {
+              required: true,
+              message: 'Please input your Email'
+            }
+          ]}
         >
           <Input />
         </Form.Item>
@@ -37,7 +70,7 @@ const Login: React.FC = () => {
         <Form.Item
           label='Password'
           name='password'
-          rules={[{ required: true, message: 'Please input your password!' }]}
+          rules={[{ required: true, message: 'Please input your password' }]}
         >
           <Input.Password />
         </Form.Item>

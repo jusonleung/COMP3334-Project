@@ -1,6 +1,7 @@
 import React from 'react'
 import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import configData from '../config.json'
 
 const layout = {
   labelCol: {
@@ -13,12 +14,34 @@ const layout = {
 
 const { Title } = Typography
 
-const Signup = () => {
+const SignUp = () => {
   const navigate = useNavigate()
   const gotoLoginPage = () => navigate('/')
 
-  const onFinish = (values: any) => {
-    console.log('Success:', values)
+  const onFinish = values => {
+    let email = values.email
+    let password = values.password
+    fetch(configData.SERVER_URL + 'register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        password
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error_message) {
+          alert(data.error_message)
+        } else {
+          alert(data.message)
+          navigate('/')
+        }
+      })
+      .catch(err => console.error(err))
+    console.log('Success:', values.email)
   }
 
   return (
@@ -33,19 +56,6 @@ const Signup = () => {
       >
         <Form.Item wrapperCol={{ ...layout.wrapperCol, offset: 8 }}>
           <Title level={2}>Sign Up </Title>
-        </Form.Item>
-
-        <Form.Item
-          name='username'
-          label='Username'
-          rules={[
-            {
-              required: true,
-              message: 'Please input your username'
-            }
-          ]}
-        >
-          <Input />
         </Form.Item>
 
         <Form.Item
@@ -79,9 +89,9 @@ const Signup = () => {
                 'Password can only include lowercase letter, uppercase letter, and special character (!@#$%^&*)'
             },
             {
-              pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])/,
+              pattern: /^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])/,
               message:
-                'Password must include at least one lowercase letter, one uppercase letter, and one special character (!@#$%^&*)'
+                'Password must include at least one number, one lowercase letter, one uppercase letter, and one special character (!@#$%^&*)'
             },
             {
               pattern: /^.{8,50}$/,
@@ -126,7 +136,7 @@ const Signup = () => {
         <Form.Item wrapperCol={{ ...layout.wrapperCol, offset: 8 }}>
           Already have an account?{' '}
           <span className='link' onClick={gotoLoginPage}>
-            Sign up
+            Log in
           </span>
         </Form.Item>
       </Form>
@@ -134,4 +144,4 @@ const Signup = () => {
   )
 }
 
-export default Signup
+export default SignUp
