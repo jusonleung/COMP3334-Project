@@ -15,10 +15,11 @@ const crypto = require('crypto')
 const { Novu } = require('@novu/node')
 const jwt = require('jsonwebtoken')
 
-const PORT = parseInt(process.env.PORT, 10)
-const MAX_INVALID_ATTEMPT = parseInt(process.env.MAX_INVALID_ATTEMPT, 10)
-const CSV_PATH = process.env.CSV_PATH
-const SECRET_KEY = process.env.SECRET_KEY
+const PORT = 4000
+const MAX_INVALID_ATTEMPT = 3
+const CSV_PATH = 'users.csv'
+const SECRET_KEY =
+  'c6599d14324d6a3c011209e5317bfec8eb4506be0bf03a5b8c07d1e7fab9a6a974686bc0662fdcf5c900d79035fbcc124559d0d89a45d80b11e2ca2e10a41373'
 
 const novu = new Novu(process.env.NOVU_API_KEY)
 
@@ -251,7 +252,7 @@ const sendOTP = async email => {
   }
 }
 
-router.post('/api/login/2fa',authenticateToken, (req, res) => {
+router.post('/api/login/2fa', authenticateToken, (req, res) => {
   const result = userList.find(user => user.email === req.user.email)
   const OTPresult = OTPs.find(otp => otp.email === req.user.email)
   //If no user exists or account is locked
@@ -259,14 +260,14 @@ router.post('/api/login/2fa',authenticateToken, (req, res) => {
     return res.status(400)
   }
 
-  if(OTPresult.expireTime < Date.now()){
+  if (OTPresult.expireTime < Date.now()) {
     sendOTP(OTPresult.email)
     return res.status(400).json({
       error_message: 'OTP expired, a new one was sent'
     })
   }
-  
-  if (req.body.OTP !== OTPresult.OTP){
+
+  if (req.body.OTP !== OTPresult.OTP) {
     return res.status(400).json({
       error_message: 'Invalid OTP'
     })
