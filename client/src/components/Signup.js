@@ -15,8 +15,9 @@ const layout = {
 const { Title } = Typography
 
 const SignUp = () => {
+  console.log('sign up')
   const navigate = useNavigate()
-  const gotoLoginPage = () => navigate('/')
+  const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
 
   const onFinish = values => {
     let email = values.email
@@ -37,7 +38,7 @@ const SignUp = () => {
           alert(data.error_message)
         } else {
           alert(data.message)
-          navigate('/')
+          gotoLoginPage()
         }
       })
       .catch(err => console.error(err))
@@ -94,8 +95,8 @@ const SignUp = () => {
                 'Password must include at least one number, one lowercase letter, one uppercase letter, and one special character (!@#$%^&*)'
             },
             {
-              pattern: /^.{8,50}$/,
-              message: 'Password length must more than 8'
+              pattern: /^.{8,30}$/,
+              message: 'Password length must between 8 to 30'
             }
           ]}
         >

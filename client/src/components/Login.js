@@ -1,15 +1,23 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import configData from "../config.json";
+import configData from '../config.json'
 
 const { Title } = Typography
 
 const Login = () => {
   const navigate = useNavigate()
-  const gotoSignUpPage = () => navigate('/register')
+  const gotoSignUpPage = () => navigate(configData.PATH.REGISTER)
+  const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
 
-  const onFinish = (values) => {
+  useEffect(() => {
+    console.log('redirect to dashboard')
+    if (localStorage.getItem('token') !== null) {
+      gotoDashboardPage()
+    }
+  })
+
+  const onFinish = values => {
     let email = values.email
     let password = values.password
     fetch(configData.SERVER_URL + 'login', {
@@ -27,13 +35,12 @@ const Login = () => {
         if (data.error_message) {
           alert(data.error_message)
         } else {
-          //alert(data.token)
-          localStorage.setItem("token", data.token);
-          navigate('/')
+          localStorage.setItem('token', data.token)
+          gotoDashboardPage()
         }
       })
       .catch(err => console.error(err))
-    console.log('Success:', values.email, values.password)
+    //console.log('Success:', values.email, values.password)
   }
 
   return (

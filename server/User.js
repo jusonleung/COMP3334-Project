@@ -6,7 +6,6 @@ class User {
     this.activate = activate
     this.lock = lock
     this.invalidAttempt = 0
-    this.token = ''
   }
 }
 

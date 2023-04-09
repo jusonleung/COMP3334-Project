@@ -1,20 +1,24 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import Login from "./components/Login";
-import SignUp from "./components/SignUp";
-/* import Dashboard from "./components/Dashboard";
-import EmailVerify from "./components/EmailVerify"; */
+import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
+import Login from './components/Login'
+import SignUp from './components/SignUp'
+import Dashboard from './components/Dashboard'
+import EmailVerify from './components/EmailVerify'
+//import RouteGuard from './components/RouteGuard'
+import Home from './components/Home'
+import configData from './config.json'
 
-function App() {
-    return (
-        <BrowserRouter>
-            <Routes>
-                <Route path='/' element={<Login />} />
-                <Route path='/register' element={<SignUp />} />
-                {/* <Route path='/dashboard' element={<Dashboard />} />
-                <Route path='email/verify' element={<EmailVerify />} /> */}
-            </Routes>
-        </BrowserRouter>
-    );
+function App () {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path={configData.PATH.LOGIN} element={<Login />} />
+        <Route path={configData.PATH.REGISTER} element={<SignUp />} />
+        <Route path={configData.PATH.DASHBOARD} element={<Dashboard />} />
+        {/* <Route path={configData.PATH.VERIFY} element={<EmailVerify />} /> */}
+        <Route path='*' element={<Home />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
-export default App;
+export default App
