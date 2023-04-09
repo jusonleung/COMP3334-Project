@@ -33,7 +33,8 @@ const csvWriter = createCsvWriter({
   ]
 })
 
-const userList = []
+let userList = []
+let OTPs = []
 fs.createReadStream(CSV_PATH)
   .pipe(csv())
   .on('data', data => {
@@ -60,25 +61,6 @@ const hash = str => {
   hash.update(str)
   return hash.digest('hex')
 }
-
-const generateToken = email => {
-  return jwt.sign({ email: email }, SECRET_KEY, { expiresIn: '1h' })
-}
-
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization']
-  const token = authHeader && authHeader.split(' ')[1]
-
-  if (token == null) return res.sendStatus(401)
-
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403)
-    req.user = user
-
-    next()
-  })
-}
-
 
 const updateRowByEmail = (email, columnToUpdate, newValue) => {
   const results = []
@@ -107,23 +89,6 @@ const registerSchema = Joi.object({
     .required()
 })
 
-const sendOTP = async (email, OTP) => {
-  try {
-    let response = await novu.trigger('OTP', {
-      to: {
-        subscriberId: email,
-        email: email
-      },
-      payload: {
-        OTP: OTP
-      }
-    })
-    console.log(response)
-  } catch (err) {
-    console.error(err)
-  }
-}
-
 const options = {
   key: fs.readFileSync('key'),
   cert: fs.readFileSync('cert')
@@ -133,8 +98,35 @@ router.use(express.urlencoded({ extended: true }))
 router.use(express.json())
 router.use(cors())
 
+const generateToken = (email, OTP_verify) => {
+  return jwt.sign({ email: email, OTP_verify: OTP_verify }, SECRET_KEY, {
+    expiresIn: '1h'
+  })
+}
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+
+  if (token == null) return res.sendStatus(401)
+
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) return res.sendStatus(403)
+    req.user = user
+    next()
+  })
+}
+
+/********
+Root
+*********/
 router.get('/api', authenticateToken, (req, res) => {
-  res.json(req.user.email)
+  if (
+    !req.user.OTP_verify ||
+    !userList.find(user => user.email === req.user.email)
+  )
+    return res.status(400)
+  res.json({ email: req.user.email })
 })
 
 /********
@@ -152,7 +144,7 @@ router.post('/api/register', (req, res) => {
   }
 
   //Checks if there is an existing user with the same email or password
-  let result = userList.find(user => user.email === email)
+  const result = userList.find(user => user.email === email)
 
   //Runs if a user exists
   if (result) {
@@ -190,7 +182,7 @@ router.post('/api/login', (req, res) => {
   //Accepts the user's credentials
   const { email, password } = req.body
   //Checks for user(s) with the same email and password
-  let result = userList.find(user => user.email === email)
+  const result = userList.find(user => user.email === email)
 
   //If no user exists
   if (!result) {
@@ -222,11 +214,67 @@ router.post('/api/login', (req, res) => {
       error_message: 'Invalid password, Attempt:' + result.invalidAttempt
     })
   }
-
+  sendOTP(email)
   //Returns a token after a successful login
-  token = generateToken(email)
+  const token = generateToken(email, false)
   res.json({
-    message: 'Login successfully',
+    message: 'Please enter the OTP in your email',
+    token: token
+  })
+})
+
+/********
+2fa
+*********/
+const sendOTP = async email => {
+  try {
+    OTPs = OTPs.filter(otp => otp.email !== email)
+    const OTP = generateRandomNumber()
+    let response = await novu.trigger('OTP', {
+      to: {
+        subscriberId: email,
+        email: email
+      },
+      payload: {
+        OTP: OTP
+      }
+    })
+    const newOTP = {
+      email: email,
+      OTP: OTP,
+      expireTime: Date.now() + 60000 // set the expire time to 1 minute from now
+    }
+    OTPs.push(newOTP)
+    //console.log(response)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+router.post('/api/login/2fa',authenticateToken, (req, res) => {
+  const result = userList.find(user => user.email === req.user.email)
+  const OTPresult = OTPs.find(otp => otp.email === req.user.email)
+  //If no user exists or account is locked
+  if (!result || !OTPresult || result.lock === 'true') {
+    return res.status(400)
+  }
+
+  if(OTPresult.expireTime < Date.now()){
+    sendOTP(OTPresult.email)
+    return res.status(400).json({
+      error_message: 'OTP expired, a new one was sent'
+    })
+  }
+  
+  if (req.body.OTP !== OTPresult.OTP){
+    return res.status(400).json({
+      error_message: 'Invalid OTP'
+    })
+  }
+
+  const token = generateToken(OTPresult.email, true)
+  res.json({
+    message: 'Login sucessfuly',
     token: token
   })
 })

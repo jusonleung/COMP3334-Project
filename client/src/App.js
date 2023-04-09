@@ -2,8 +2,6 @@ import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
 import Login from './components/Login'
 import SignUp from './components/SignUp'
 import Dashboard from './components/Dashboard'
-import EmailVerify from './components/EmailVerify'
-//import RouteGuard from './components/RouteGuard'
 import Home from './components/Home'
 import configData from './config.json'
 

@@ -9,11 +9,13 @@ const Dashboard = () => {
   const navigate = useNavigate()
   const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
   const [email, setEmail] = useState(null)
+  const [verified_2fa, setVerified_2fa] = useState(null)
 
   useEffect(() => {
-    console.log('api call')
+    console.log('call api')
     axiosInstance.get().then(res => {
-      setEmail(res.data)
+      setEmail(res.data.email)
+      setVerified_2fa(res.data.verified_2fa)
     })
   }, [])
 

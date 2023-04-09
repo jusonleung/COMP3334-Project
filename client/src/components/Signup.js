@@ -15,7 +15,6 @@ const layout = {
 const { Title } = Typography
 
 const SignUp = () => {
-  console.log('sign up')
   const navigate = useNavigate()
   const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
 
@@ -42,7 +41,6 @@ const SignUp = () => {
         }
       })
       .catch(err => console.error(err))
-    console.log('Success:', values.email)
   }
 
   return (
