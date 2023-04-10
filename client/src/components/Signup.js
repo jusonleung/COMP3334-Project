@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
@@ -17,6 +17,8 @@ const { Title } = Typography
 const SignUp = () => {
   const navigate = useNavigate()
   const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
+
+  localStorage.clear()
 
   const onFinish = values => {
     let email = values.email

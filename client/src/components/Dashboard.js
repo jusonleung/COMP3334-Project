@@ -11,7 +11,6 @@ const Dashboard = () => {
   const [email, setEmail] = useState(null)
 
   useEffect(() => {
-    console.log('call api')
     axiosInstance.get().then(res => {
       setEmail(res.data.email)
     })
@@ -19,7 +18,8 @@ const Dashboard = () => {
 
   return (
     <Typography>
-      {email ? `Hi ${email}!` : 'Loading...'}
+      {email ? 
+      `Hi ${email}!` : 'Loading...'}
       <SignOut />
     </Typography>
   )

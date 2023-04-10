@@ -1,8 +1,9 @@
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Login from './components/Login'
 import SignUp from './components/SignUp'
 import Dashboard from './components/Dashboard'
 import Home from './components/Home'
+import Activate from './components/Activate'
 import configData from './config.json'
 
 function App () {
@@ -12,7 +13,7 @@ function App () {
         <Route path={configData.PATH.LOGIN} element={<Login />} />
         <Route path={configData.PATH.REGISTER} element={<SignUp />} />
         <Route path={configData.PATH.DASHBOARD} element={<Dashboard />} />
-        {/* <Route path={configData.PATH.VERIFY} element={<EmailVerify />} /> */}
+        <Route path={configData.PATH.ACTIVATE} element={<Activate />} />
         <Route path='*' element={<Home />} />
       </Routes>
     </BrowserRouter>

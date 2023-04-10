@@ -63,22 +63,21 @@ const hash = str => {
   return hash.digest('hex')
 }
 
-const updateRowByEmail = (email, columnToUpdate, newValue) => {
-  const results = []
-  fs.createReadStream(CSV_PATH)
-    .pipe(csv())
-    .on('data', data => results.push(data))
-    .on('end', () => {
-      const updatedResults = results.map(result => {
-        if (result.email === email) {
-          result[columnToUpdate] = newValue
-        }
-        return result
-      })
-      csvWriter
-        .writeRecords(updatedResults)
-        .then(() => console.log('CSV file updated successfully'))
-    })
+const updateCSV = () => {
+  const csvHeader = 'email,salt,password,activate,lock\n'
+  // CSV data rows
+  const csvRows = userList
+    .map(
+      row =>
+        `${row.email},${row.salt},${row.password},${row.activate},${row.lock}`
+    )
+    .join('\n')
+  // Combine header and rows
+  const csvData = csvHeader + csvRows
+  fs.writeFile(CSV_PATH, csvData, err => {
+    if (err) throw err
+    console.log('CSV file has been updated.')
+  })
 }
 
 const registerSchema = Joi.object({
@@ -130,20 +129,14 @@ const authenticateUser = (req, res, next) => {
 /********
 Root
 *********/
-router.get('/api', authenticateToken, authenticateUser, (req, res) => {
+router.get('/', authenticateToken, authenticateUser, (req, res) => {
   res.json({ email: req.user.email })
 })
-
-const generateResgisterToken = (email, password) => {
-  return jwt.sign({ email: email, password: password }, SECRET_KEY, {
-    expiresIn: '1h'
-  })
-}
 
 /********
 Resgister
 *********/
-router.post('/api/register', (req, res) => {
+router.post('/register', (req, res) => {
   //Get the user's credentials
   const { email, password } = req.body
 
@@ -167,7 +160,7 @@ router.post('/api/register', (req, res) => {
   salt = generateRandomNumber()
   const newUser = new User(email, salt, hash(salt + password), false, false)
   //Adds the user to the list of users
-  //userList.push(newUser)
+  userList.push(newUser)
   //Append user detail to users.csv
   const row = [
     newUser.email,
@@ -180,23 +173,41 @@ router.post('/api/register', (req, res) => {
     if (err) throw err
     console.log('User', row[0], 'appended to file')
   })
-  //Send OTP
-  sendOTP(email)
-  //Returns a register token
-  const token = generateResgisterToken(email, password)
+  //Send Activation Email
+  sendActivationEmail(email)
+  //Returns a message
   res.json({
-    message: 'Please enter the OTP that sent to your email',
-    token: token
-  })
-  return res.json({
-    message: 'Account created successfully'
+    message: 'An activation email has been sent to you\nplease check your inbox'
   })
 })
+
+const sendActivationEmail = async (email, locked) => {
+  try {
+    const token = generateToken(email, 'activate')
+    /* let response = await novu.trigger('activation-email', {
+      to: {
+        subscriberId: email,
+        email: email
+      },
+      payload: {
+        link: `http://localhost:3000/activate?token=${token}`
+      }
+    }) */
+    console.log(
+      `To ${email}: Click this link to ${
+        locked ? 'unlock' : 'activate'
+      } your email\nhttp://localhost:3000/activate?token=${token}`
+    )
+    //console.log(response)
+  } catch (err) {
+    console.error(err)
+  }
+}
 
 /********
 Login
 *********/
-router.post('/api/login', (req, res) => {
+router.post('/login', (req, res) => {
   //Accepts the user's credentials
   const { email, password } = req.body
   //Checks for user(s) with the same email and password
@@ -211,6 +222,7 @@ router.post('/api/login', (req, res) => {
 
   //If account is locked
   if (result.lock === 'true') {
+    sendActivationEmail(result.email, true)
     return res.status(400).json({
       error_message:
         'This account is temporarily locked\nTo unlock, please check you email'
@@ -222,10 +234,10 @@ router.post('/api/login', (req, res) => {
     result.invalidAttempt++
     if (result.invalidAttempt > MAX_INVALID_ATTEMPT) {
       result.lock = true
-      updateRowByEmail(result.email, 'lock', 'true')
+      updateCSV()
+      sendActivationEmail(result.email, true)
       return res.status(400).json({
-        error_message:
-          'Multiple invalid logins, the account is temporarily locked\nTo unlock, please check you email'
+        error_message: `Multiple invalid logins, the account is temporarily locked\nTo unlock, please check you email`
       })
     }
     return res.status(400).json({
@@ -237,6 +249,26 @@ router.post('/api/login', (req, res) => {
   const token = generateToken(email, 'login')
   res.json({
     message: 'Please enter the OTP that sent to your email',
+    token: token
+  })
+})
+
+/********
+activate
+*********/
+router.get('/activate', authenticateToken, (req, res) => {
+  let user = userList.find(user => user.email === req.user.email)
+  if (req.user.state !== 'activate' || !user) return res.status(400)
+  let locked = user.lock
+  if (locked) user.lock = false
+  user.activate = true
+  user.invalidAttempt = 0
+  //updateRowByEmail('jusonleung3@gmail.com','activate',true)
+  updateCSV()
+  updateCSV()
+  const token = generateToken(user.email, 'verified')
+  res.json({
+    message: `Your account ${user.email} is ${locked?'unlocked':'activated'}`,
     token: token
   })
 })
@@ -284,7 +316,7 @@ const checkExpiredOTPs = () => {
 // Call checkExpiredOTPs every 3 minutes
 setInterval(checkExpiredOTPs, 3 * 60 * 1000)
 
-router.post('/api/login/2fa', authenticateToken, (req, res) => {
+router.post('/login/2fa', authenticateToken, (req, res) => {
   const result = userList.find(user => user.email === req.user.email)
   const OTPresult = OTPs.find(otp => otp.email === req.user.email)
   //If no user exists or account is locked
@@ -317,9 +349,9 @@ router.post('/api/login/2fa', authenticateToken, (req, res) => {
   })
 })
 
-router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
+router.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
-app.use('/', router)
+app.use('/api', router)
 
 https.createServer(options, app).listen(PORT, () => {
   console.log(`Server listening on https://localhost:${PORT}/`)

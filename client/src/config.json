@@ -4,6 +4,6 @@
         "LOGIN": "/login",
         "REGISTER": "/register",
         "DASHBOARD": "/dashboard",
-        "VERIFY": "/verify"
+        "ACTIVATE": "/activate"
     }
 }
