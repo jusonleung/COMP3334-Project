@@ -99,8 +99,8 @@ router.use(express.urlencoded({ extended: true }))
 router.use(express.json())
 router.use(cors())
 
-const generateToken = (email, OTP_verify) => {
-  return jwt.sign({ email: email, OTP_verify: OTP_verify }, SECRET_KEY, {
+const generateToken = (email, state) => {
+  return jwt.sign({ email: email, state: state }, SECRET_KEY, {
     expiresIn: '1h'
   })
 }
@@ -112,23 +112,33 @@ const authenticateToken = (req, res, next) => {
   if (token == null) return res.sendStatus(401)
 
   jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403)
+    if (err) return res.sendStatus(403).json(err)
     req.user = user
     next()
   })
 }
 
-/********
-Root
-*********/
-router.get('/api', authenticateToken, (req, res) => {
+const authenticateUser = (req, res, next) => {
   if (
-    !req.user.OTP_verify ||
+    req.user.state !== 'verified' ||
     !userList.find(user => user.email === req.user.email)
   )
     return res.status(400)
+  next()
+}
+
+/********
+Root
+*********/
+router.get('/api', authenticateToken, authenticateUser, (req, res) => {
   res.json({ email: req.user.email })
 })
+
+const generateResgisterToken = (email, password) => {
+  return jwt.sign({ email: email, password: password }, SECRET_KEY, {
+    expiresIn: '1h'
+  })
+}
 
 /********
 Resgister
@@ -157,7 +167,7 @@ router.post('/api/register', (req, res) => {
   salt = generateRandomNumber()
   const newUser = new User(email, salt, hash(salt + password), false, false)
   //Adds the user to the list of users
-  userList.push(newUser)
+  //userList.push(newUser)
   //Append user detail to users.csv
   const row = [
     newUser.email,
@@ -170,7 +180,14 @@ router.post('/api/register', (req, res) => {
     if (err) throw err
     console.log('User', row[0], 'appended to file')
   })
-  //Returns a message
+  //Send OTP
+  sendOTP(email)
+  //Returns a register token
+  const token = generateResgisterToken(email, password)
+  res.json({
+    message: 'Please enter the OTP that sent to your email',
+    token: token
+  })
   return res.json({
     message: 'Account created successfully'
   })
@@ -217,9 +234,9 @@ router.post('/api/login', (req, res) => {
   }
   sendOTP(email)
   //Returns a token after a successful login
-  const token = generateToken(email, false)
+  const token = generateToken(email, 'login')
   res.json({
-    message: 'Please enter the OTP in your email',
+    message: 'Please enter the OTP that sent to your email',
     token: token
   })
 })
@@ -231,7 +248,7 @@ const sendOTP = async email => {
   try {
     OTPs = OTPs.filter(otp => otp.email !== email)
     const OTP = generateRandomNumber()
-    let response = await novu.trigger('OTP', {
+    /* let response = await novu.trigger('OTP', {
       to: {
         subscriberId: email,
         email: email
@@ -239,7 +256,8 @@ const sendOTP = async email => {
       payload: {
         OTP: OTP
       }
-    })
+    }) */
+    console.log(`To ${email}: Your verification code is ${OTP}`)
     const newOTP = {
       email: email,
       OTP: OTP,
@@ -252,11 +270,30 @@ const sendOTP = async email => {
   }
 }
 
+// Function to check and remove expired OTPs
+const checkExpiredOTPs = () => {
+  const currentTime = Date.now()
+  for (let i = OTPs.length - 1; i >= 0; i--) {
+    const { expireTime } = OTPs[i]
+    if (expireTime < currentTime) {
+      OTPs.splice(i, 1)
+    }
+  }
+}
+
+// Call checkExpiredOTPs every 3 minutes
+setInterval(checkExpiredOTPs, 3 * 60 * 1000)
+
 router.post('/api/login/2fa', authenticateToken, (req, res) => {
   const result = userList.find(user => user.email === req.user.email)
   const OTPresult = OTPs.find(otp => otp.email === req.user.email)
   //If no user exists or account is locked
-  if (!result || !OTPresult || result.lock === 'true') {
+  if (
+    req.user.state !== 'login' ||
+    !result ||
+    !OTPresult ||
+    result.lock === 'true'
+  ) {
     return res.status(400)
   }
 
@@ -273,7 +310,7 @@ router.post('/api/login/2fa', authenticateToken, (req, res) => {
     })
   }
 
-  const token = generateToken(OTPresult.email, true)
+  const token = generateToken(OTPresult.email, 'verified')
   res.json({
     message: 'Login sucessfuly',
     token: token

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
+import TwoFA from './Twofa'
 
 const { Title } = Typography
 
@@ -10,7 +11,6 @@ const Login = () => {
   const gotoSignUpPage = () => navigate(configData.PATH.REGISTER)
   const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
   const [show2faForm, setShow2faForm] = useState(false)
-  const [token, setToken] = useState('')
 
   useEffect(() => {
     if (localStorage.getItem('token') !== null) {
@@ -36,40 +36,14 @@ const Login = () => {
         if (data.error_message) {
           alert(data.error_message)
         } else {
-          setToken(data.token)
+          //setToken(data.token)
           setShow2faForm(true)
-          //localStorage.setItem('token', data.token)
+          localStorage.setItem('2faToken', data.token)
           //gotoDashboardPage()
         }
       })
       .catch(err => console.error(err))
     //console.log('Success:', values.email, values.password)
-  }
-
-  const on2faFinish = values => {
-    // submit the 2FA code and get the JWT token
-    const OTP = values.OTP
-    fetch(configData.SERVER_URL + 'login/2fa', {
-      method: 'POST',
-      body: JSON.stringify({
-        
-        OTP: OTP
-      }),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.error_message) {
-          alert(data.error_message)
-        } else {
-          localStorage.setItem('token', data.token)
-          gotoDashboardPage()
-        }
-      })
-      .catch(err => console.error(err))
   }
 
   return (
@@ -127,28 +101,7 @@ const Login = () => {
         </Form>
       )}
       {show2faForm && (
-        <Form
-          name='2fa'
-          labelCol={{ span: 8 }}
-          wrapperCol={{ span: 16 }}
-          style={{ maxWidth: 600 }}
-          onFinish={on2faFinish}
-          autoComplete='off'
-        >
-          <Title level={2}>Two-Factor Authentication</Title>
-          <Form.Item name='OTP' rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Typography>
-            A verification code is sent to your email, please enter the code to
-            continue
-          </Typography>
-          <Form.Item>
-            <Button type='primary' htmlType='submit'>
-              Submit
-            </Button>
-          </Form.Item>
-        </Form>
+        <TwoFA API='login' navigateTo={configData.PATH.DASHBOARD} />
       )}
     </div>
   )

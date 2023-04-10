@@ -12,8 +12,8 @@ axiosInstance.interceptors.response.use(
   response => response,
   error => {
     localStorage.clear()
+    alert(error)
     window.location.href = '/login'
-
     return Promise.reject(error)
   }
 )
