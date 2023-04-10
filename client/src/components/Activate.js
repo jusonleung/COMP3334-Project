@@ -4,10 +4,9 @@ import configData from '../config.json'
 
 const Activate = () => {
   const [searchParams] = useSearchParams()
-  console.log(searchParams)
   const token = searchParams.get('token')
   const navigate = useNavigate()
-
+  const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
 
     fetch(configData.SERVER_URL + 'activate', {
       method: 'GET',
@@ -23,7 +22,7 @@ const Activate = () => {
         } else {
           alert(data.message)
           localStorage.setItem('token', data.token)
-          navigate(configData.PATH.DASHBOARD)
+          gotoDashboardPage()
         }
       })
       .catch(err => console.error(err))

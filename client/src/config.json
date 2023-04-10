@@ -4,6 +4,9 @@
         "LOGIN": "/login",
         "REGISTER": "/register",
         "DASHBOARD": "/dashboard",
-        "ACTIVATE": "/activate"
+        "ACTIVATE": "/activate",
+        "CHANGEPASSWORD": "/dashboard/changepw",
+        "FORGETPASSWORD": "/forgetpw",
+        "RESETPASSWORD": "/resetpw"
     }
 }

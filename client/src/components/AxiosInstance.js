@@ -2,19 +2,18 @@ import axios from 'axios'
 import configData from '../config.json'
 
 const axiosInstance = axios.create({
-  baseURL: configData.SERVER_URL,
-  headers: {
-    Authorization: localStorage.getItem('token')
-  }
+  baseURL: configData.SERVER_URL
 })
 
 axiosInstance.interceptors.response.use(
   response => response,
   error => {
-    localStorage.clear()
-    alert(error)
-    window.location.href = '/login'
-    return Promise.reject(error)
+    if (error.response && error.response.status === 401) {
+      localStorage.clear()
+      //alert(error)
+      window.location.href = '/login'
+      return Promise.reject(error)
+    }
   }
 )
 

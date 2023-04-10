@@ -80,13 +80,15 @@ const updateCSV = () => {
   })
 }
 
+const passwordSchema = Joi.string()
+  .min(8)
+  .max(30)
+  .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).+$'))
+  .required()
+
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
-  password: Joi.string()
-    .min(8)
-    .max(30)
-    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).+$'))
-    .required()
+  password: passwordSchema
 })
 
 const options = {
@@ -111,7 +113,7 @@ const authenticateToken = (req, res, next) => {
   if (token == null) return res.sendStatus(401)
 
   jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403).json(err)
+    if (err) return res.sendStatus(401).json(err)
     req.user = user
     next()
   })
@@ -122,7 +124,7 @@ const authenticateUser = (req, res, next) => {
     req.user.state !== 'verified' ||
     !userList.find(user => user.email === req.user.email)
   )
-    return res.status(400)
+    return res.status(401)
   next()
 }
 
@@ -258,7 +260,7 @@ activate
 *********/
 router.get('/activate', authenticateToken, (req, res) => {
   let user = userList.find(user => user.email === req.user.email)
-  if (req.user.state !== 'activate' || !user) return res.status(400)
+  if (req.user.state !== 'activate' || !user) return res.status(401)
   let locked = user.lock
   if (locked) user.lock = false
   user.activate = true
@@ -268,14 +270,13 @@ router.get('/activate', authenticateToken, (req, res) => {
   updateCSV()
   const token = generateToken(user.email, 'verified')
   res.json({
-    message: `Your account ${user.email} is ${locked?'unlocked':'activated'}`,
+    message: `Your account ${user.email} is ${
+      locked ? 'unlocked' : 'activated'
+    }`,
     token: token
   })
 })
 
-/********
-2fa
-*********/
 const sendOTP = async email => {
   try {
     OTPs = OTPs.filter(otp => otp.email !== email)
@@ -316,6 +317,9 @@ const checkExpiredOTPs = () => {
 // Call checkExpiredOTPs every 3 minutes
 setInterval(checkExpiredOTPs, 3 * 60 * 1000)
 
+/********
+2fa
+*********/
 router.post('/login/2fa', authenticateToken, (req, res) => {
   const result = userList.find(user => user.email === req.user.email)
   const OTPresult = OTPs.find(otp => otp.email === req.user.email)
@@ -326,7 +330,7 @@ router.post('/login/2fa', authenticateToken, (req, res) => {
     !OTPresult ||
     result.lock === 'true'
   ) {
-    return res.status(400)
+    return res.status(401)
   }
 
   if (OTPresult.expireTime < Date.now()) {
@@ -346,6 +350,101 @@ router.post('/login/2fa', authenticateToken, (req, res) => {
   res.json({
     message: 'Login sucessfuly',
     token: token
+  })
+})
+
+/********
+Change Password
+*********/
+router.post('/changePw', authenticateToken, authenticateUser, (req, res) => {
+  const { oldPassword, newPassword } = req.body
+  let user = userList.find(user => user.email === req.user.email)
+
+  //If wrong old password
+  if (hash(user.salt + oldPassword) !== user.password) {
+    return res.status(400).json({
+      error_message: 'Invalid old password'
+    })
+  }
+
+  //check if new password is valid
+  const validateResult = passwordSchema.validate(newPassword)
+  if (validateResult.error) {
+    return res.status(400).json({
+      error_message: validateResult.error.message
+    })
+  }
+
+  //set new salt and password for user
+  user.salt = generateRandomNumber()
+  user.password = hash(user.salt + newPassword)
+  updateCSV()
+
+  //Return sucessfull message
+  res.json({
+    message: 'Change Password sucessfully'
+  })
+})
+
+/********
+Forget Password
+*********/
+router.post('/forgetPw', (req, res) => {
+  const { email } = req.body
+  let user = userList.find(user => user.email === email)
+  if (user) {
+    sendPwResetEmail(user.email)
+  }
+  res.sendStatus(200)
+})
+
+const sendPwResetEmail = async email => {
+  try {
+    const token = generateToken(email, 'resetPw')
+    /* let response = await novu.trigger('reset-password-email', {
+      to: {
+        subscriberId: email,
+        email: email
+      },
+      payload: {
+        link: `http://localhost:3000/resetpw?token=${token}`
+      }
+    }) */
+    console.log(
+      `To ${email}: Click this link to reset your password\nhttp://localhost:3000/resetpw?token=${token}`
+    )
+    //console.log(response)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+/********
+Reset Password
+*********/
+router.post('/resetPw', authenticateToken, (req, res) => {
+  let user = userList.find(user => user.email === req.user.email)
+  if (req.user.state !== 'resetPw' || !user) {
+    return res.status(401)
+  }
+  const { password } = req.body
+
+  //check if new password is valid
+  const validateResult = passwordSchema.validate(password)
+  if (validateResult.error) {
+    return res.status(400).json({
+      error_message: validateResult.error.message
+    })
+  }
+
+  //set new salt and password for user
+  user.salt = generateRandomNumber()
+  user.password = hash(user.salt + password)
+  updateCSV()
+
+  //Return sucessfull message
+  res.json({
+    message: 'Reset Password sucessfully'
   })
 })
 

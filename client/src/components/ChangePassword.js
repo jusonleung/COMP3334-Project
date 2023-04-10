@@ -1,37 +1,34 @@
-import React, { useEffect } from 'react'
-import { Button, Form, Input, Typography } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Button, Form, Input, Slider, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
-
-const layout = {
-  labelCol: {
-    span: 8
-  },
-  wrapperCol: {
-    span: 16
-  }
-}
+import { axiosInstance } from './AxiosInstance'
 
 const { Title } = Typography
 
-const SignUp = () => {
+const ChangePassword = () => {
   const navigate = useNavigate()
-  const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
+  const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
 
-  localStorage.clear()
+  useEffect(() => {
+    axiosInstance.get()
+  }, [])
 
   const onFinish = values => {
-    let email = values.email
-    let password = values.password
-    fetch(configData.SERVER_URL + 'register', {
+    const oldPassword = values.oldPassword
+    const newPassword = values.newPassword
+    const token = localStorage.getItem('token')
+
+    fetch(configData.SERVER_URL + 'changePw', {
       method: 'POST',
-      body: JSON.stringify({
-        email,
-        password
-      }),
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        oldPassword,
+        newPassword
+      })
     })
       .then(res => res.json())
       .then(data => {
@@ -39,50 +36,43 @@ const SignUp = () => {
           alert(data.error_message)
         } else {
           alert(data.message)
-          gotoLoginPage()
+          gotoDashboardPage()
         }
       })
       .catch(err => console.error(err))
   }
 
   return (
-    <div className='signup__container'>
+    <div className='login__container'>
       <Form
-        {...layout}
-        name='sign-up'
-        onFinish={onFinish}
+        name='changePw'
         labelCol={{ span: 8 }}
         wrapperCol={{ span: 16 }}
         style={{ maxWidth: 600 }}
+        onFinish={onFinish}
+        autoComplete='off'
       >
-        <Form.Item wrapperCol={{ ...layout.wrapperCol, offset: 8 }}>
-          <Title level={2}>Sign Up </Title>
+        <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
+          <Title level={2}>Change Password</Title>
         </Form.Item>
 
         <Form.Item
-          name='email'
-          label='Email'
+          label='Old Password'
+          name='oldPassword'
           rules={[
-            {
-              type: 'email',
-              message: 'The input is not valid Email'
-            },
-            {
-              required: true,
-              message: 'Please input your Email'
-            }
+            { required: true, message: 'Please enter your old password' }
           ]}
         >
-          <Input />
+          <Input.Password />
         </Form.Item>
 
         <Form.Item
-          name='password'
-          label='Password'
+          name='newPassword'
+          label='New Password'
           rules={[
             {
               required: true,
-              type: 'password'
+              message: 'Please enter your new password'
             },
             {
               pattern: /^[a-zA-Z0-9!@#$%^&*]/,
@@ -97,7 +87,18 @@ const SignUp = () => {
             {
               pattern: /^.{8,30}$/,
               message: 'Password length must between 8 to 30'
-            }
+            },
+            ({ getFieldValue }) => ({
+              validator (_, value) {
+                if (getFieldValue('oldPassword') === value) {
+                  return Promise.reject(
+                    new Error('New password can not same as the old password')
+                  )
+                } else {
+                  return Promise.resolve()
+                }
+              }
+            })
           ]}
         >
           <Input.Password />
@@ -105,17 +106,17 @@ const SignUp = () => {
 
         <Form.Item
           name='confirm'
-          label='Confirm Password'
-          dependencies={['password']}
+          label='Confirm New Password'
+          dependencies={['newPassword']}
           hasFeedback
           rules={[
             {
               required: true,
-              message: 'Please confirm your password'
+              message: 'Please confirm your new password'
             },
             ({ getFieldValue }) => ({
               validator (_, value) {
-                if (!value || getFieldValue('password') === value) {
+                if (!value || getFieldValue('newPassword') === value) {
                   return Promise.resolve()
                 }
                 return Promise.reject(
@@ -128,21 +129,14 @@ const SignUp = () => {
           <Input.Password />
         </Form.Item>
 
-        <Form.Item wrapperCol={{ ...layout.wrapperCol, offset: 8 }}>
+        <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
           <Button type='primary' htmlType='submit'>
-            Sign In
+            Submit
           </Button>
-        </Form.Item>
-
-        <Form.Item wrapperCol={{ ...layout.wrapperCol, offset: 8 }}>
-          Already have an account?{' '}
-          <span className='link' onClick={gotoLoginPage}>
-            Log in
-          </span>
         </Form.Item>
       </Form>
     </div>
   )
 }
 
-export default SignUp
+export default ChangePassword

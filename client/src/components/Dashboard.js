@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Button, Form, Input, Slider, Typography } from 'antd'
+import { Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
 import { axiosInstance } from './AxiosInstance'
@@ -7,7 +7,7 @@ import SignOut from './SignOut'
 
 const Dashboard = () => {
   const navigate = useNavigate()
-  const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
+  const gotoChangePasswordPage = () => navigate(configData.PATH.CHANGEPASSWORD)
   const [email, setEmail] = useState(null)
 
   useEffect(() => {
@@ -18,8 +18,17 @@ const Dashboard = () => {
 
   return (
     <Typography>
-      {email ? 
-      `Hi ${email}!` : 'Loading...'}
+      {email ? (
+        <div>
+          Hi {email}!
+          <br></br>
+          <span className='link' onClick={gotoChangePasswordPage}>
+            Change Password
+          </span>
+        </div>
+      ) : (
+        'Loading...'
+      )}
       <SignOut />
     </Typography>
   )

@@ -10,6 +10,7 @@ const Login = () => {
   const navigate = useNavigate()
   const gotoSignUpPage = () => navigate(configData.PATH.REGISTER)
   const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
+  const gotoForgetPwPage = () => navigate(configData.PATH.FORGETPASSWORD)
   const [show2faForm, setShow2faForm] = useState(false)
 
   useEffect(() => {
@@ -67,11 +68,11 @@ const Login = () => {
             rules={[
               {
                 type: 'email',
-                message: 'The input is not valid Email'
+                message: 'It is not valid Email'
               },
               {
                 required: true,
-                message: 'Please input your Email'
+                message: 'Please enter your Email'
               }
             ]}
           >
@@ -81,7 +82,7 @@ const Login = () => {
           <Form.Item
             label='Password'
             name='password'
-            rules={[{ required: true, message: 'Please input your password' }]}
+            rules={[{ required: true, message: 'Please enter your password' }]}
           >
             <Input.Password />
           </Form.Item>
@@ -96,6 +97,12 @@ const Login = () => {
             Don't have an account?{' '}
             <span className='link' onClick={gotoSignUpPage}>
               Sign up
+            </span>
+          </Form.Item>
+
+          <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
+            <span className='link' onClick={gotoForgetPwPage}>
+              Forget password?
             </span>
           </Form.Item>
         </Form>
