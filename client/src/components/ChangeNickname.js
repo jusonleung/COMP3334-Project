@@ -18,22 +18,10 @@ const ChangeNickname = () => {
   const onFinish = values => {
     const nickname = values.nickname
     const token = localStorage.getItem('token')
-    fetch(configData.SERVER_URL + 'changeNickname', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        nickname
-      })
-    })
-      .then(res => res.json())
-      .then(data => {
-        alert(data.message)
+    axiosInstance.post('changeNickname', {nickname: nickname}).then(res => {
+      alert(res.data.message)
         gotoDashboardPage()
-      })
-      .catch(err => console.error(err))
+    })
   }
 
   return (

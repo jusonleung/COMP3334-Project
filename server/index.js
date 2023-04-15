@@ -161,7 +161,14 @@ router.post('/register', (req, res) => {
   }
   //creates the structure for the user
   salt = generateRandomNumber()
-  const newUser = new User(email, nickname, salt, hash(salt + password), false, false)
+  const newUser = new User(
+    email,
+    nickname,
+    salt,
+    hash(salt + password),
+    false,
+    false
+  )
   //Adds the user to the list of users
   userList.push(newUser)
   //Append user detail to users.csv
@@ -500,13 +507,45 @@ router.get('/levelUp', authenticateToken, authenticateUser, (req, res) => {
 /******************************
 Change nickname
 *******************************/
-router.post('/changeNickname', authenticateToken, authenticateUser, (req, res) => {
-  const { nickname } = req.body
-  req.user.nickname = nickname
-  res.json({
-    message: `Your nickname have been changed to "${req.user.nickname}"`,
-  })
-})
+router.post(
+  '/changeNickname',
+  authenticateToken,
+  authenticateUser,
+  (req, res) => {
+    const { nickname } = req.body
+    req.user.nickname = nickname
+    updateCSV()
+    res.json({
+      message: `Your nickname have been changed to "${req.user.nickname}"`
+    })
+  }
+)
+
+/******************************
+Get leaderboard
+*******************************/
+router.get('/getLeaderboard', authenticateToken, authenticateUser, (req, res) => {
+    const sortedList = userList.slice().sort((a, b) => {
+      if (a.level === b.level) {
+        return b.coin - a.coin
+      } else {
+        return b.level - a.level
+      }
+    })
+    const leaderboard = sortedList.slice(0, 10).map(user => ({
+      rank: sortedList.findIndex(u => u === user) + 1,
+      nickname: user.nickname,
+      level: user.level,
+      coin: user.coin
+    }));
+
+    const rank = sortedList.findIndex(user => user.email === req.user.email) + 1
+    res.json({
+      leaderboard: leaderboard,
+      rank: rank
+    })
+  }
+)
 
 router.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 

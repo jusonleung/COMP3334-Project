@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { Typography, Button, Space } from 'antd'
+import { Typography, Button, Space, Col, Row } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
 import { axiosInstance } from './AxiosInstance'
 import SignOut from './SignOut'
+import Leaderboard from './Leaderboard'
 
 const Dashboard = () => {
   const navigate = useNavigate()
   const gotoChangePasswordPage = () => navigate(configData.PATH.CHANGEPASSWORD)
   const gotoChangeNicknamePage = () => navigate(configData.PATH.CHANGENICKNAME)
+  const [flag, setFlag] = useState(false)
   const [nickname, setNickname] = useState(null)
   const [coin, setCoin] = useState(null)
   const [level, setLevel] = useState(null)
@@ -20,6 +22,7 @@ const Dashboard = () => {
       setNickname(res.data.nickname)
       setCoin(res.data.coin)
       setLevel(res.data.level)
+      setFlag(true)
     })
   }, [chanceToGetCoin])
 
@@ -38,8 +41,8 @@ const Dashboard = () => {
   }
 
   return (
-    <Typography className= 'dashboard'>
-      {nickname ? (
+    <Typography className='dashboard'>
+      {flag ? (
         <div>
           Hi {nickname}!<br />
           You are at level {level}, you have {coin} coins.
@@ -61,6 +64,13 @@ const Dashboard = () => {
               <Button onClick={levelUp}>Level Up</Button>
             </Space>
           )}
+          <br />
+          <br />
+          <Row>
+            <Col span={12}>
+              <Leaderboard />
+            </Col>
+          </Row>
           <br />
           <Space>
             <span className='link' onClick={gotoChangePasswordPage}>
