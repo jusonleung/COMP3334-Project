@@ -7,6 +7,7 @@ import Activate from './components/Activate'
 import ChangePassword from './components/ChangePassword'
 import ForgetPassword from './components/ForgetPassword'
 import ResetPassword from './components/ResetPassword'
+import ChangeNickname from './components/ChangeNickname'
 import configData from './config.json'
 
 function App () {
@@ -28,6 +29,10 @@ function App () {
         <Route
           path={configData.PATH.RESETPASSWORD}
           element={<ResetPassword />}
+        />
+        <Route
+          path={configData.PATH.CHANGENICKNAME}
+          element={<ChangeNickname />}
         />
         <Route path='*' element={<Home />} />
       </Routes>

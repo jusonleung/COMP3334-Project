@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Typography } from 'antd'
+import { Typography, Button, Space } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
 import { axiosInstance } from './AxiosInstance'
@@ -8,28 +8,74 @@ import SignOut from './SignOut'
 const Dashboard = () => {
   const navigate = useNavigate()
   const gotoChangePasswordPage = () => navigate(configData.PATH.CHANGEPASSWORD)
-  const [email, setEmail] = useState(null)
+  const gotoChangeNicknamePage = () => navigate(configData.PATH.CHANGENICKNAME)
+  const [nickname, setNickname] = useState(null)
+  const [coin, setCoin] = useState(null)
+  const [level, setLevel] = useState(null)
+  const chanceToGetCoin = configData.CHANCETOGETCOIN
+  const coinsToLevelUp = configData.COINSTOLEVELUP
 
   useEffect(() => {
-    axiosInstance.get().then(res => {
-      setEmail(res.data.email)
+    axiosInstance.get('/getInfo').then(res => {
+      setNickname(res.data.nickname)
+      setCoin(res.data.coin)
+      setLevel(res.data.level)
     })
-  }, [])
+  }, [chanceToGetCoin])
+
+  const getCoin = () => {
+    axiosInstance.get('/getCoin').then(res => {
+      setCoin(res.data.coin)
+      alert(res.data.message)
+    })
+  }
+
+  const levelUp = () => {
+    axiosInstance.get('/levelUp').then(res => {
+      setLevel(res.data.level)
+      alert(res.data.message)
+    })
+  }
 
   return (
     <Typography>
-      {email ? (
+      {nickname ? (
         <div>
-          Hi {email}!
-          <br></br>
-          <span className='link' onClick={gotoChangePasswordPage}>
-            Change Password
-          </span>
+          Hi {nickname}!<br />
+          You are at level {level}, you have {coin} coins.
+          <br />
+          <Space>
+            <div>
+              You now have {chanceToGetCoin[level] * 100}% chance to get a coin.
+            </div>
+            <Button onClick={getCoin}> Try Get Coin</Button>
+          </Space>
+          <br />
+          <br />
+          {level < 5 && (
+            <Space>
+              <div>
+                Use {coinsToLevelUp[level]} coins to level up, and you can get
+                coins with a {chanceToGetCoin[level + 1] * 100}% chance.
+              </div>
+              <Button onClick={levelUp}>Level Up</Button>
+            </Space>
+          )}
+          <br />
+          <Space>
+            <span className='link' onClick={gotoChangePasswordPage}>
+              Change Password
+            </span>
+            <span className='link' onClick={gotoChangeNicknamePage}>
+              Change Nickname
+            </span>
+          </Space>
+          <br />
+          <SignOut />
         </div>
       ) : (
         'Loading...'
       )}
-      <SignOut />
     </Typography>
   )
 }

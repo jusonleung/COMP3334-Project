@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
@@ -23,11 +23,13 @@ const SignUp = () => {
   const onFinish = values => {
     let email = values.email
     let password = values.password
+    let nickname = values.nickname
     fetch(configData.SERVER_URL + 'register', {
       method: 'POST',
       body: JSON.stringify({
         email,
-        password
+        password,
+        nickname
       }),
       headers: {
         'Content-Type': 'application/json'
@@ -70,6 +72,19 @@ const SignUp = () => {
             {
               required: true,
               message: 'Please input your Email'
+            }
+          ]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name='nickname'
+          label='Nickname'
+          rules={[
+            {
+              required: true,
+              message: 'Please input your nickname'
             }
           ]}
         >

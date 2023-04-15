@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Button, Form, Input, Slider, Typography } from 'antd'
+import React, { useEffect } from 'react'
+import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
 import { axiosInstance } from './AxiosInstance'
@@ -11,7 +11,7 @@ const ChangePassword = () => {
   const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
 
   useEffect(() => {
-    axiosInstance.get()
+    axiosInstance.get('getInfo')
   }, [])
 
   const onFinish = values => {

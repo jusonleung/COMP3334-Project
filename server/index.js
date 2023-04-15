@@ -22,17 +22,8 @@ const SECRET_KEY =
   'c6599d14324d6a3c011209e5317bfec8eb4506be0bf03a5b8c07d1e7fab9a6a974686bc0662fdcf5c900d79035fbcc124559d0d89a45d80b11e2ca2e10a41373'
 
 const novu = new Novu(process.env.NOVU_API_KEY)
-
-const csvWriter = createCsvWriter({
-  path: CSV_PATH,
-  header: [
-    { id: 'email', title: 'email' },
-    { id: 'salt', title: 'salt' },
-    { id: 'password', title: 'password' },
-    { id: 'activate', title: 'activate' },
-    { id: 'lock', title: 'lock' }
-  ]
-})
+const chanceToGetCoin = [0.1, 0.15, 0.25, 0.4, 0.65, 1]
+const coinsToLevelUp = [5, 10, 30, 80]
 
 let userList = []
 let OTPs = []
@@ -41,15 +32,19 @@ fs.createReadStream(CSV_PATH)
   .on('data', data => {
     const user = new User(
       data.email,
+      data.nickname,
       data.salt,
       data.password,
       data.activate,
-      data.lock
+      data.lock,
+      parseInt(data.coin),
+      parseInt(data.level)
     )
     userList.push(user)
   })
   .on('end', () => {
     console.log('Finish reading users.csv')
+    console.log(userList)
   })
 
 const generateRandomNumber = () => {
@@ -64,12 +59,12 @@ const hash = str => {
 }
 
 const updateCSV = () => {
-  const csvHeader = 'email,salt,password,activate,lock\n'
+  const csvHeader = 'email,nickname,salt,password,activate,lock,coin,level\n'
   // CSV data rows
   const csvRows = userList
     .map(
       row =>
-        `${row.email},${row.salt},${row.password},${row.activate},${row.lock}`
+        `${row.email},${row.nickname},${row.salt},${row.password},${row.activate},${row.lock},${row.coin},${row.level}`
     )
     .join('\n')
   // Combine header and rows
@@ -120,19 +115,25 @@ const authenticateToken = (req, res, next) => {
 }
 
 const authenticateUser = (req, res, next) => {
-  if (
-    req.user.state !== 'verified' ||
-    !userList.find(user => user.email === req.user.email)
-  )
-    return res.status(401)
+  user = userList.find(u => u.email === req.user.email)
+  if (req.user.state !== 'verified' || !user) return res.status(401)
+  req.user = user
   next()
 }
 
+router.get('/', (req, res) => {
+  res.json({ message: 'Hello world' })
+})
+
 /********
-Root
+getInfo
 *********/
-router.get('/', authenticateToken, authenticateUser, (req, res) => {
-  res.json({ email: req.user.email })
+router.get('/getInfo', authenticateToken, authenticateUser, (req, res) => {
+  res.json({
+    nickname: req.user.nickname,
+    coin: req.user.coin,
+    level: req.user.level
+  })
 })
 
 /********
@@ -140,7 +141,7 @@ Resgister
 *********/
 router.post('/register', (req, res) => {
   //Get the user's credentials
-  const { email, password } = req.body
+  const { email, password, nickname } = req.body
 
   const validateResult = registerSchema.validate({ email, password })
   if (validateResult.error) {
@@ -160,7 +161,7 @@ router.post('/register', (req, res) => {
   }
   //creates the structure for the user
   salt = generateRandomNumber()
-  const newUser = new User(email, salt, hash(salt + password), false, false)
+  const newUser = new User(email, nickname, salt, hash(salt + password), false, false)
   //Adds the user to the list of users
   userList.push(newUser)
   //Append user detail to users.csv
@@ -386,9 +387,9 @@ router.post('/changePw', authenticateToken, authenticateUser, (req, res) => {
   })
 })
 
-/********
+/*****************************
 Forget Password
-*********/
+******************************/
 router.post('/forgetPw', (req, res) => {
   const { email } = req.body
   let user = userList.find(user => user.email === email)
@@ -419,9 +420,9 @@ const sendPwResetEmail = async email => {
   }
 }
 
-/********
+/******************************
 Reset Password
-*********/
+*******************************/
 router.post('/resetPw', authenticateToken, (req, res) => {
   let user = userList.find(user => user.email === req.user.email)
   if (req.user.state !== 'resetPw' || !user) {
@@ -445,6 +446,65 @@ router.post('/resetPw', authenticateToken, (req, res) => {
   //Return sucessfull message
   res.json({
     message: 'Reset Password sucessfully'
+  })
+})
+
+/******************************
+Get coin
+*******************************/
+router.get('/getCoin', authenticateToken, authenticateUser, (req, res) => {
+  ran = Math.random()
+  flag = false
+  try {
+    if (ran <= chanceToGetCoin[req.user.level]) {
+      req.user.coin++
+      updateCSV()
+      res.json({
+        message: 'Congratulation, you got a coin!!!',
+        coin: req.user.coin
+      })
+    } else {
+      res.json({
+        message: 'Sorry, you got nothing.',
+        coin: req.user.coin
+      })
+    }
+  } catch (error) {
+    return res.sendStatus(400)
+  }
+})
+
+/******************************
+level Up
+*******************************/
+router.get('/levelUp', authenticateToken, authenticateUser, (req, res) => {
+  if (req.user.level >= 5)
+    return res.json({
+      message: 'You have reached the max level',
+      level: req.user.level
+    })
+  if (req.user.coin < coinsToLevelUp[req.user.level])
+    return res.json({
+      message: 'Sorry, you do not have enough coins to level up',
+      level: req.user.level
+    })
+  req.user.coin -= coinsToLevelUp[req.user.level]
+  req.user.level++
+  updateCSV()
+  res.json({
+    message: `Congratulation, you reached level ${req.user.level}!!!`,
+    level: req.user.level
+  })
+})
+
+/******************************
+Change nickname
+*******************************/
+router.post('/changeNickname', authenticateToken, authenticateUser, (req, res) => {
+  const { nickname } = req.body
+  req.user.nickname = nickname
+  res.json({
+    message: `Your nickname have been changed to "${req.user.nickname}"`,
   })
 })
 
