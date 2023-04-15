@@ -38,7 +38,7 @@ const Dashboard = () => {
   }
 
   return (
-    <Typography>
+    <Typography className= 'dashboard'>
       {nickname ? (
         <div>
           Hi {nickname}!<br />

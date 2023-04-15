@@ -3,6 +3,7 @@ import { Button, Form, Input, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import configData from '../config.json'
 import { axiosInstance } from './AxiosInstance'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 
 const { Title } = Typography
 
@@ -11,7 +12,7 @@ const ChangePassword = () => {
   const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
 
   useEffect(() => {
-    axiosInstance.get('getInfo')
+    axiosInstance.get()
   }, [])
 
   const onFinish = values => {
@@ -44,6 +45,7 @@ const ChangePassword = () => {
 
   return (
     <div className='login__container'>
+      <ArrowLeftOutlined onClick={gotoDashboardPage}/>
       <Form
         name='changePw'
         labelCol={{ span: 8 }}

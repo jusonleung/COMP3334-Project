@@ -7,7 +7,6 @@ class User {
     this.activate = activate
     this.lock = lock
     this.invalidAttempt = 0
-    
     this.coin = coin
     //0: 10% 1:15% 2:25% 3:40% 4:65% 5:100% 
     this.level = level

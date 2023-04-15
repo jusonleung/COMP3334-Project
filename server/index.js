@@ -121,7 +121,7 @@ const authenticateUser = (req, res, next) => {
   next()
 }
 
-router.get('/', (req, res) => {
+router.get('/', authenticateToken, authenticateUser, (req, res) => {
   res.json({ message: 'Hello world' })
 })
 
