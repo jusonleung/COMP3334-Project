@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from 'antd';
 import configData from '../config.json'
 
-const SignOut = () => {
+const SignOut = ({socket}) => {
   const navigate = useNavigate();
 
   const handleSignOut = () => {
     localStorage.clear()
+    socket.close();
     navigate(configData.PATH.LOGIN)
   };
 

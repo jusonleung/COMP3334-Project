@@ -1,5 +1,5 @@
 {
-    "SERVER_URL": "https://localhost:4000/api/",
+    "SERVER_URL": "https://localhost:4000/api",
     "PATH":{
         "LOGIN": "/login",
         "REGISTER": "/register",
@@ -8,7 +8,12 @@
         "CHANGEPASSWORD": "/changepw",
         "FORGETPASSWORD": "/forgetpw",
         "RESETPASSWORD": "/resetpw",
-        "CHANGENICKNAME": "/changenickname"
+        "CHANGENICKNAME": "/changenickname",
+        "INFO": "/info",
+        "GETCOIN": "/getcoin",
+        "LEVELUP": "/levelUp",
+        "LEADERBOARD": "/leaderboard",
+        "2FA": "/2fa"
     },
     "CHANCETOGETCOIN": [0.1, 0.15, 0.25, 0.4, 0.65, 1],
     "COINSTOLEVELUP": [5, 10, 30, 80]

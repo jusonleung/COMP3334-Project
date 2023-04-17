@@ -24,7 +24,7 @@ const SignUp = () => {
     let email = values.email
     let password = values.password
     let nickname = values.nickname
-    fetch(configData.SERVER_URL + 'register', {
+    fetch(configData.SERVER_URL + configData.PATH.REGISTER, {
       method: 'POST',
       body: JSON.stringify({
         email,

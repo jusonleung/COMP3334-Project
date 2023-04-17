@@ -7,7 +7,7 @@ const Activate = () => {
   const navigate = useNavigate()
   const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
 
-    fetch(configData.SERVER_URL + 'activate', {
+    fetch(configData.SERVER_URL + configData.PATH.ACTIVATE, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

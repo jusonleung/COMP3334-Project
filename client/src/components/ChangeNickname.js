@@ -17,8 +17,7 @@ const ChangeNickname = () => {
 
   const onFinish = values => {
     const nickname = values.nickname
-    const token = localStorage.getItem('token')
-    axiosInstance.post('changeNickname', {nickname: nickname}).then(res => {
+    axiosInstance.post(configData.PATH.CHANGENICKNAME, {nickname: nickname}).then(res => {
       alert(res.data.message)
         gotoDashboardPage()
     })

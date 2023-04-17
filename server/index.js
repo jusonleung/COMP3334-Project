@@ -14,7 +14,17 @@ const swaggerDocument = require('./swagger.json')
 const crypto = require('crypto')
 const { Novu } = require('@novu/node')
 const jwt = require('jsonwebtoken')
+const options = {
+  key: fs.readFileSync('key'),
+  cert: fs.readFileSync('cert')
+}
+const server = https.createServer(options, app)
 
+const io = require('socket.io')(server, {
+  cors: {
+    origin: 'http://localhost:3000'
+  }
+})
 const PORT = 4000
 const MAX_INVALID_ATTEMPT = 3
 const CSV_PATH = 'users.csv'
@@ -44,7 +54,7 @@ fs.createReadStream(CSV_PATH)
   })
   .on('end', () => {
     console.log('Finish reading users.csv')
-    console.log(userList)
+    //console.log(userList)
   })
 
 const generateRandomNumber = () => {
@@ -86,11 +96,6 @@ const registerSchema = Joi.object({
   password: passwordSchema
 })
 
-const options = {
-  key: fs.readFileSync('key'),
-  cert: fs.readFileSync('cert')
-}
-
 router.use(express.urlencoded({ extended: true }))
 router.use(express.json())
 router.use(cors())
@@ -126,9 +131,9 @@ router.get('/', authenticateToken, authenticateUser, (req, res) => {
 })
 
 /********
-getInfo
+Info
 *********/
-router.get('/getInfo', authenticateToken, authenticateUser, (req, res) => {
+router.get('/info', authenticateToken, authenticateUser, (req, res) => {
   res.json({
     nickname: req.user.nickname,
     coin: req.user.coin,
@@ -524,33 +529,83 @@ router.post(
 /******************************
 Get leaderboard
 *******************************/
-router.get('/getLeaderboard', authenticateToken, authenticateUser, (req, res) => {
-    const sortedList = userList.slice().sort((a, b) => {
-      if (a.level === b.level) {
-        return b.coin - a.coin
-      } else {
-        return b.level - a.level
-      }
-    })
-    const leaderboard = sortedList.slice(0, 10).map(user => ({
-      rank: sortedList.findIndex(u => u === user) + 1,
-      nickname: user.nickname,
-      level: user.level,
-      coin: user.coin
-    }));
+router.get('/leaderboard', authenticateToken, authenticateUser, (req, res) => {
+  const sortedList = userList.slice().sort((a, b) => {
+    if (a.level === b.level) {
+      return b.coin - a.coin
+    } else {
+      return b.level - a.level
+    }
+  })
+  const leaderboard = sortedList.slice(0, 10).map(user => ({
+    rank: sortedList.findIndex(u => u === user) + 1,
+    nickname: user.nickname,
+    level: user.level,
+    coin: user.coin
+  }))
 
-    const rank = sortedList.findIndex(user => user.email === req.user.email) + 1
-    res.json({
-      leaderboard: leaderboard,
-      rank: rank
-    })
-  }
-)
+  const rank = sortedList.findIndex(user => user.email === req.user.email) + 1
+  res.json({
+    leaderboard: leaderboard,
+    rank: rank
+  })
+})
 
 router.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
 app.use('/api', router)
 
-https.createServer(options, app).listen(PORT, () => {
+/******************************
+Web socket for chatroom
+*******************************/
+// Middleware function to authenticate the JWT token
+const authenticateTokenForSocket = (socket, next) => {
+  const authHeader = socket.handshake.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+
+  if (token == null) {
+    return next(new Error('Authentication error: Missing or invalid token'))
+  }
+
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) {
+      return next(new Error('Authentication error: Invalid token'))
+    }
+    socket.user = user
+    next()
+  })
+}
+
+// Middleware function to authenticate the user
+const authenticateUserForSocket = (socket, next) => {
+  const user = userList.find(u => u.email === socket.user.email)
+
+  if (socket.user.state !== 'verified' || !user) {
+    return next(
+      new Error('Authentication error: User not verified or not found')
+    )
+  }
+
+  socket.user = user
+  next()
+}
+
+io.use(authenticateTokenForSocket)
+io.use(authenticateUserForSocket)
+
+io.on('connection', socket => {
+  console.log(`${socket.user.email} connected`)
+
+  socket.on('message', data => {
+    console.log(`${socket.user.nickname}(${socket.user.email}): ${data}`)
+    io.emit('messageResponse', `${socket.user.nickname}: ${data}`)
+  })
+
+  socket.on('disconnect', () => {
+    console.log(`${socket.user.email} disconnected`)
+  })
+})
+
+server.listen(PORT, () => {
   console.log(`Server listening on https://localhost:${PORT}/`)
 })

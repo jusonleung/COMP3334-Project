@@ -12,7 +12,7 @@ const ResetPassword = () => {
 
   const onFinish = values => {
     const password = values.password
-    fetch(configData.SERVER_URL + 'resetPw', {
+    fetch(configData.SERVER_URL + configData.PATH.RESETPASSWORD, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

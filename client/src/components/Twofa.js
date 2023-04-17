@@ -11,7 +11,7 @@ const TwoFA = props => {
   const onFinish = values => {
     // submit the 2FA code and get the JWT token
     const OTP = values.OTP
-    fetch(configData.SERVER_URL + props.API + '/2fa', {
+    fetch(configData.SERVER_URL + props.API + configData.PATH['2FA'], {
       method: 'POST',
       body: JSON.stringify({
         OTP: OTP

@@ -20,7 +20,7 @@ const ChangePassword = () => {
     const newPassword = values.newPassword
     const token = localStorage.getItem('token')
 
-    fetch(configData.SERVER_URL + 'changePw', {
+    fetch(configData.SERVER_URL + configData.PATH.CHANGEPASSWORD, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

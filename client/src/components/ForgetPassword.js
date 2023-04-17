@@ -7,7 +7,7 @@ const ForgetPassword = () => {
 
   const onFinish = values => {
     const email = values.email
-    fetch(configData.SERVER_URL + 'forgetPw', {
+    fetch(configData.SERVER_URL + configData.PATH.FORGETPASSWORD, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -1,6 +1,7 @@
 import { axiosInstance } from './AxiosInstance'
 import React, { useState, useEffect } from 'react'
 import { Table, Typography } from 'antd'
+import configData from '../config.json'
 
 const { Column } = Table
 const { Title } = Typography
@@ -9,7 +10,7 @@ const Leaderboard = () => {
   const [leaderboard, setLeaderboard] = useState(null)
   const [rank, setRank] = useState(null)
   useEffect(() => {
-    axiosInstance.get('/getLeaderboard').then(res => {
+    axiosInstance.get(configData.PATH.LEADERBOARD).then(res => {
       setLeaderboard(res.data.leaderboard)
       setRank(res.data.rank)
     })
@@ -24,6 +25,7 @@ const Leaderboard = () => {
         <Column title='Level' dataIndex='level' key='level' />
         <Column title='Coin' dataIndex='coin' key='coin' />
       </Table>
+      <Typography>You are at rank {rank}</Typography>
     </div>
   )
 }

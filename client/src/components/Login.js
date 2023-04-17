@@ -22,7 +22,7 @@ const Login = () => {
   const onFinish = values => {
     const email = values.email
     const password = values.password
-    fetch(configData.SERVER_URL + 'login', {
+    fetch(configData.SERVER_URL + configData.PATH.LOGIN, {
       method: 'POST',
       body: JSON.stringify({
         email,
@@ -108,7 +108,7 @@ const Login = () => {
         </Form>
       )}
       {show2faForm && (
-        <TwoFA API='login' navigateTo={configData.PATH.DASHBOARD} />
+        <TwoFA API='/login' navigateTo={configData.PATH.DASHBOARD} />
       )}
     </div>
   )

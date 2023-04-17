@@ -5,6 +5,8 @@ import configData from '../config.json'
 import { axiosInstance } from './AxiosInstance'
 import SignOut from './SignOut'
 import Leaderboard from './Leaderboard'
+import ChatRoom from './ChatRoom'
+import { io } from 'socket.io-client'
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -17,8 +19,20 @@ const Dashboard = () => {
   const chanceToGetCoin = configData.CHANCETOGETCOIN
   const coinsToLevelUp = configData.COINSTOLEVELUP
 
+  const socket = io('https://localhost:4000', {
+    secure: true,
+    rejectUnauthorized: false,
+    transportOptions: {
+      polling: {
+        extraHeaders: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    }
+  })
+
   useEffect(() => {
-    axiosInstance.get('/getInfo').then(res => {
+    axiosInstance.get(configData.PATH.INFO).then(res => {
       setNickname(res.data.nickname)
       setCoin(res.data.coin)
       setLevel(res.data.level)
@@ -27,14 +41,14 @@ const Dashboard = () => {
   }, [chanceToGetCoin])
 
   const getCoin = () => {
-    axiosInstance.get('/getCoin').then(res => {
+    axiosInstance.get(configData.PATH.GETCOIN).then(res => {
       setCoin(res.data.coin)
       alert(res.data.message)
     })
   }
 
   const levelUp = () => {
-    axiosInstance.get('/levelUp').then(res => {
+    axiosInstance.get(configData.PATH.LEVELUP).then(res => {
       setLevel(res.data.level)
       alert(res.data.message)
     })
@@ -72,6 +86,8 @@ const Dashboard = () => {
             </Col>
           </Row>
           <br />
+          <ChatRoom socket={socket} />
+          <br />
           <Space>
             <span className='link' onClick={gotoChangePasswordPage}>
               Change Password
@@ -81,7 +97,7 @@ const Dashboard = () => {
             </span>
           </Space>
           <br />
-          <SignOut />
+          <SignOut socket={socket}/>
         </div>
       ) : (
         'Loading...'
