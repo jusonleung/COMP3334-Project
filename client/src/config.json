@@ -16,5 +16,5 @@
         "2FA": "/2fa"
     },
     "CHANCETOGETCOIN": [0.1, 0.15, 0.25, 0.4, 0.65, 1],
-    "COINSTOLEVELUP": [5, 10, 30, 80]
+    "COINSTOLEVELUP": [5, 10, 30, 80, 200]
 }

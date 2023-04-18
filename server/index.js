@@ -8,12 +8,13 @@ const app = express()
 const Joi = require('joi')
 const csv = require('csv-parser')
 const createCsvWriter = require('csv-writer').createObjectCsvWriter
-const User = require('./user.js')
 const swaggerUi = require('swagger-ui-express')
 const swaggerDocument = require('./swagger.json')
 const crypto = require('crypto')
 const { Novu } = require('@novu/node')
 const jwt = require('jsonwebtoken')
+const sql = require('mssql/msnodesqlv8')
+
 const options = {
   key: fs.readFileSync('key'),
   cert: fs.readFileSync('cert')
@@ -27,35 +28,64 @@ const io = require('socket.io')(server, {
 })
 const PORT = 4000
 const MAX_INVALID_ATTEMPT = 3
-const CSV_PATH = 'users.csv'
 const SECRET_KEY =
   'c6599d14324d6a3c011209e5317bfec8eb4506be0bf03a5b8c07d1e7fab9a6a974686bc0662fdcf5c900d79035fbcc124559d0d89a45d80b11e2ca2e10a41373'
 
 const novu = new Novu(process.env.NOVU_API_KEY)
 const chanceToGetCoin = [0.1, 0.15, 0.25, 0.4, 0.65, 1]
-const coinsToLevelUp = [5, 10, 30, 80]
+const coinsToLevelUp = [5, 10, 30, 80, 200]
 
-let userList = []
-let OTPs = []
-fs.createReadStream(CSV_PATH)
-  .pipe(csv())
-  .on('data', data => {
-    const user = new User(
-      data.email,
-      data.nickname,
-      data.salt,
-      data.password,
-      data.activate,
-      data.lock,
-      parseInt(data.coin),
-      parseInt(data.level)
+//Create a MSSQL connection pool
+const pool = new sql.ConnectionPool({
+  database: 'COMP3334',
+  server: 'localhost',
+  driver: 'msnodesqlv8',
+  options: {
+    trustedConnection: true
+  }
+})
+
+/* //Create a MSSQL connection pool
+const pool = new sql.ConnectionPool({
+  user:process.env.DB_USER,
+  password:process.env.DB_PASSWORD,
+  server:process.env.DB_SERVER,   //這邊要注意一下!!
+  database:process.env.DB_DATABASE
+}) */
+
+const poolConnect = pool.connect()
+poolConnect
+  .then(() => {
+    console.log('Connected to MSSQL server')
+  })
+  .catch(err => {
+    console.error('Failed to connect to MSSQL server', err)
+  })
+
+const getUserByEmail = async email => {
+  try {
+    await poolConnect
+
+    const request = new sql.Request(pool)
+    request.input('Email', sql.VarChar(50), email)
+
+    const result = await request.query(
+      `SELECT * FROM [dbo].[User] WHERE [Email] = @Email`
     )
-    userList.push(user)
-  })
-  .on('end', () => {
-    console.log('Finish reading users.csv')
-    //console.log(userList)
-  })
+
+    if (result.recordset.length === 0) {
+      console.log('No user found with the provided email')
+      return null
+    }
+
+    return result.recordset[0]
+  } catch (err) {
+    console.error('Failed to connect to MSSQL server', err)
+    throw err
+  }
+}
+
+let OTPs = []
 
 const generateRandomNumber = () => {
   const randomNumber = Math.floor(Math.random() * 10000) // generates a random number between 0 and 999999
@@ -66,23 +96,6 @@ const hash = str => {
   const hash = crypto.createHash('sha256')
   hash.update(str)
   return hash.digest('hex')
-}
-
-const updateCSV = () => {
-  const csvHeader = 'email,nickname,salt,password,activate,lock,coin,level\n'
-  // CSV data rows
-  const csvRows = userList
-    .map(
-      row =>
-        `${row.email},${row.nickname},${row.salt},${row.password},${row.activate},${row.lock},${row.coin},${row.level}`
-    )
-    .join('\n')
-  // Combine header and rows
-  const csvData = csvHeader + csvRows
-  fs.writeFile(CSV_PATH, csvData, err => {
-    if (err) throw err
-    console.log('CSV file has been updated.')
-  })
 }
 
 const passwordSchema = Joi.string()
@@ -119,8 +132,8 @@ const authenticateToken = (req, res, next) => {
   })
 }
 
-const authenticateUser = (req, res, next) => {
-  user = userList.find(u => u.email === req.user.email)
+const authenticateUser = async (req, res, next) => {
+  let user = await getUserByEmail(req.user.email)
   if (req.user.state !== 'verified' || !user) return res.status(401)
   req.user = user
   next()
@@ -144,7 +157,7 @@ router.get('/info', authenticateToken, authenticateUser, (req, res) => {
 /********
 Resgister
 *********/
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   //Get the user's credentials
   const { email, password, nickname } = req.body
 
@@ -156,7 +169,7 @@ router.post('/register', (req, res) => {
   }
 
   //Checks if there is an existing user with the same email or password
-  const result = userList.find(user => user.email === email)
+  const result = await getUserByEmail(email)
 
   //Runs if a user exists
   if (result) {
@@ -166,28 +179,36 @@ router.post('/register', (req, res) => {
   }
   //creates the structure for the user
   salt = generateRandomNumber()
-  const newUser = new User(
-    email,
-    nickname,
-    salt,
-    hash(salt + password),
-    false,
-    false
-  )
-  //Adds the user to the list of users
-  userList.push(newUser)
-  //Append user detail to users.csv
-  const row = [
-    newUser.email,
-    newUser.salt,
-    newUser.password,
-    newUser.activate,
-    newUser.lock
-  ]
-  fs.appendFile(CSV_PATH, row.join(',') + '\n', err => {
-    if (err) throw err
-    console.log('User', row[0], 'appended to file')
-  })
+  // Insert data into the "User" table
+  poolConnect
+    .then(() => {
+      const request = new sql.Request(pool)
+      request
+        .input('Email', sql.VarChar(50), email)
+        .input('Nickname', sql.VarChar(50), nickname)
+        .input('Salt', sql.NChar(4), salt)
+        .input('Password', sql.Char(64), hash(salt + password))
+        .input('Activate', sql.Bit, false)
+        .input('Lock', sql.Bit, false)
+        .input('InvalidAttempt', sql.Int, 0)
+        .input('Coin', sql.Int, 0)
+        .input('Level', sql.Int, 0)
+        .query(
+          `INSERT INTO [dbo].[User] ([Email], [Nickname], [Salt], [Password], [Activate], [Lock] ,[InvalidAttempt], [Coin], [Level])
+            VALUES (@Email, @Nickname, @Salt, @Password, @Activate, @Lock, @InvalidAttempt, @Coin, @Level)`,
+          (err, result) => {
+            if (err) {
+              console.error('Failed to execute SQL query', err)
+              return
+            }
+            console.log('Data inserted successfully')
+          }
+        )
+    })
+    .catch(err => {
+      console.error('Failed to connect to MSSQL server', err)
+    })
+
   //Send Activation Email
   sendActivationEmail(email)
   //Returns a message
@@ -198,16 +219,18 @@ router.post('/register', (req, res) => {
 
 const sendActivationEmail = async (email, locked) => {
   try {
+    console.log(email)
     const token = generateToken(email, 'activate')
-    /* let response = await novu.trigger('activation-email', {
+    let response = await novu.trigger('activation-email', {
       to: {
         subscriberId: email,
         email: email
       },
       payload: {
+        action: locked ? 'unlock' : 'activate',
         link: `http://localhost:3000/activate?token=${token}`
       }
-    }) */
+    })
     console.log(
       `To ${email}: Click this link to ${
         locked ? 'unlock' : 'activate'
@@ -222,11 +245,12 @@ const sendActivationEmail = async (email, locked) => {
 /********
 Login
 *********/
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   //Accepts the user's credentials
   const { email, password } = req.body
   //Checks for user(s) with the same email and password
-  const result = userList.find(user => user.email === email)
+
+  result = await getUserByEmail(email)
 
   //If no user exists
   if (!result) {
@@ -235,8 +259,17 @@ router.post('/login', (req, res) => {
     })
   }
 
+  //If account is not activated
+  if (!result.activate) {
+    sendActivationEmail(result.email)
+    return res.status(400).json({
+      error_message:
+        'This account is not activated\nAn activation email has been sent to you\nplease check your inbox'
+    })
+  }
+
   //If account is locked
-  if (result.lock === 'true') {
+  if (result.lock) {
     sendActivationEmail(result.email, true)
     return res.status(400).json({
       error_message:
@@ -247,10 +280,41 @@ router.post('/login', (req, res) => {
   //If wrong password
   if (hash(result.salt + password) !== result.password) {
     result.invalidAttempt++
+    try {
+      await poolConnect
+
+      const request = new sql.Request(pool)
+
+      // Update user's lock status
+
+      request.input('invalidAttempt', sql.Int, result.invalidAttempt) // Set invalidAttempt++
+      request.input('Email', sql.VarChar(50), email) // Specify the email of the user to update
+      await request.query(`UPDATE [dbo].[User]
+                           SET [invalidAttempt] = @invalidAttempt
+                           WHERE [Email] = @Email`)
+      console.log(`User with email ${email} invalidAttempt updated successfully`)
+    } catch (err) {
+      console.error('Failed to connect to MSSQL server', err)
+    }
     if (result.invalidAttempt > MAX_INVALID_ATTEMPT) {
-      result.lock = true
-      updateCSV()
-      sendActivationEmail(result.email, true)
+      try {
+        await poolConnect
+
+        const request = new sql.Request(pool)
+
+        // Update user's lock status
+
+        request.input('Lock', sql.Bit, false) // Set Lock = false
+        request.input('Email', sql.VarChar(50), email) // Specify the email of the user to update
+        await request.query(`UPDATE [dbo].[User]
+                             SET [Lock] = @Lock
+                             WHERE [Email] = @Email`)
+        console.log(`User with email ${email} lock status updated successfully`)
+      } catch (err) {
+        console.error('Failed to connect to MSSQL server', err)
+      }
+
+      sendActivationEmail(email, true)
       return res.status(400).json({
         error_message: `Multiple invalid logins, the account is temporarily locked\nTo unlock, please check you email`
       })
@@ -271,22 +335,33 @@ router.post('/login', (req, res) => {
 /********
 activate
 *********/
-router.get('/activate', authenticateToken, (req, res) => {
-  let user = userList.find(user => user.email === req.user.email)
+router.get('/activate', authenticateToken, async (req, res) => {
+  let user = await getUserByEmail(req.user.email)
   if (req.user.state !== 'activate' || !user) return res.status(401)
-  let locked = user.lock
-  if (locked) user.lock = false
-  user.activate = true
-  user.invalidAttempt = 0
-  //updateRowByEmail('jusonleung3@gmail.com','activate',true)
-  updateCSV()
-  updateCSV()
-  const token = generateToken(user.email, 'verified')
+
+  try {
+    await poolConnect
+
+    const request = new sql.Request(pool)
+
+    request.input('Lock', sql.Bit, false) // Update Lock to false
+    request.input('Activate', sql.Bit, true) // Update Activate to true
+    request.input('InvalidAttempt', sql.Int, 0) // Update InvalidAttempt to 0
+    request.input('Email', sql.VarChar(50), req.user.email) // Specify the email of the user to update
+    await request.query(`UPDATE [dbo].[User]
+                                          SET [Lock] = @Lock,
+                                              [Activate] = @Activate,
+                                              [InvalidAttempt] = @InvalidAttempt
+                                          WHERE [Email] = @Email`)
+    console.log(`User with email ${req.user.email} updated successfully`)
+  } catch (err) {
+    console.error('Failed to connect to MSSQL server', err)
+  }
+
   res.json({
     message: `Your account ${user.email} is ${
-      locked ? 'unlocked' : 'activated'
-    }`,
-    token: token
+      user.lock ? 'unlocked' : 'activated'
+    }`
   })
 })
 
@@ -294,7 +369,7 @@ const sendOTP = async email => {
   try {
     OTPs = OTPs.filter(otp => otp.email !== email)
     const OTP = generateRandomNumber()
-    /* let response = await novu.trigger('OTP', {
+    let response = await novu.trigger('OTP', {
       to: {
         subscriberId: email,
         email: email
@@ -302,7 +377,7 @@ const sendOTP = async email => {
       payload: {
         OTP: OTP
       }
-    }) */
+    })
     console.log(`To ${email}: Your verification code is ${OTP}`)
     const newOTP = {
       email: email,
@@ -333,8 +408,8 @@ setInterval(checkExpiredOTPs, 3 * 60 * 1000)
 /********
 2fa
 *********/
-router.post('/login/2fa', authenticateToken, (req, res) => {
-  const result = userList.find(user => user.email === req.user.email)
+router.post('/login/2fa', authenticateToken, async (req, res) => {
+  const result = await getUserByEmail(req.user.email)
   const OTPresult = OTPs.find(otp => otp.email === req.user.email)
   //If no user exists or account is locked
   if (
@@ -366,45 +441,74 @@ router.post('/login/2fa', authenticateToken, (req, res) => {
   })
 })
 
+const changePassword = async ({ email, newPassword }) => {
+  try {
+    await poolConnect
+
+    // Generate random number for salt
+    const salt = generateRandomNumber()
+
+    // Hash password with salt
+    const password = hash(salt + newPassword)
+
+    const request = new sql.Request(pool)
+
+    request.input('Salt', sql.NChar(4), salt) // Update Salt with the generated random number
+    request.input('Password', sql.Char(64), newPassword) // Update Password with the hashed password
+    request.input('Email', sql.VarChar(50), email) // Specify the email of the user to update
+    await request.query(`UPDATE [dbo].[User]
+                                        SET [Salt] = @Salt,
+                                            [Password] = @Password
+                                        WHERE [Email] = @Email`)
+
+    console.log(`User with email ${email} updated successfully`)
+  } catch (err) {
+    console.error('Failed to connect to MSSQL server', err)
+  }
+}
+
 /********
 Change Password
 *********/
-router.post('/changePw', authenticateToken, authenticateUser, (req, res) => {
-  const { oldPassword, newPassword } = req.body
-  let user = userList.find(user => user.email === req.user.email)
+router.post(
+  '/changePw',
+  authenticateToken,
+  authenticateUser,
+  async (req, res) => {
+    const { oldPassword, newPassword } = req.body
+    let user = await getUserByEmail(req.user.email)
 
-  //If wrong old password
-  if (hash(user.salt + oldPassword) !== user.password) {
-    return res.status(400).json({
-      error_message: 'Invalid old password'
+    //If wrong old password
+    if (hash(user.salt + oldPassword) !== user.password) {
+      return res.status(400).json({
+        error_message: 'Invalid old password'
+      })
+    }
+
+    //check if new password is valid
+    const validateResult = passwordSchema.validate(newPassword)
+    if (validateResult.error) {
+      return res.status(400).json({
+        error_message: validateResult.error.message
+      })
+    }
+
+    //set new salt and password for user
+    changePassword(user.email, newPassword)
+
+    //Return sucessfull message
+    res.json({
+      message: 'Change Password sucessfully'
     })
   }
-
-  //check if new password is valid
-  const validateResult = passwordSchema.validate(newPassword)
-  if (validateResult.error) {
-    return res.status(400).json({
-      error_message: validateResult.error.message
-    })
-  }
-
-  //set new salt and password for user
-  user.salt = generateRandomNumber()
-  user.password = hash(user.salt + newPassword)
-  updateCSV()
-
-  //Return sucessfull message
-  res.json({
-    message: 'Change Password sucessfully'
-  })
-})
+)
 
 /*****************************
 Forget Password
 ******************************/
-router.post('/forgetPw', (req, res) => {
+router.post('/forgetPw', async (req, res) => {
   const { email } = req.body
-  let user = userList.find(user => user.email === email)
+  let user = await getUserByEmail(email)
   if (user) {
     sendPwResetEmail(user.email)
   }
@@ -414,7 +518,7 @@ router.post('/forgetPw', (req, res) => {
 const sendPwResetEmail = async email => {
   try {
     const token = generateToken(email, 'resetPw')
-    /* let response = await novu.trigger('reset-password-email', {
+    let response = await novu.trigger('reset-password-email', {
       to: {
         subscriberId: email,
         email: email
@@ -422,7 +526,7 @@ const sendPwResetEmail = async email => {
       payload: {
         link: `http://localhost:3000/resetpw?token=${token}`
       }
-    }) */
+    })
     console.log(
       `To ${email}: Click this link to reset your password\nhttp://localhost:3000/resetpw?token=${token}`
     )
@@ -435,8 +539,8 @@ const sendPwResetEmail = async email => {
 /******************************
 Reset Password
 *******************************/
-router.post('/resetPw', authenticateToken, (req, res) => {
-  let user = userList.find(user => user.email === req.user.email)
+router.post('/resetPw', authenticateToken, async (req, res) => {
+  let user = await getUserByEmail(req.user.email)
   if (req.user.state !== 'resetPw' || !user) {
     return res.status(401)
   }
@@ -451,9 +555,7 @@ router.post('/resetPw', authenticateToken, (req, res) => {
   }
 
   //set new salt and password for user
-  user.salt = generateRandomNumber()
-  user.password = hash(user.salt + password)
-  updateCSV()
+  changePassword(user.email, password)
 
   //Return sucessfull message
   res.json({
@@ -464,50 +566,93 @@ router.post('/resetPw', authenticateToken, (req, res) => {
 /******************************
 Get coin
 *******************************/
-router.get('/getCoin', authenticateToken, authenticateUser, (req, res) => {
-  ran = Math.random()
-  flag = false
-  try {
-    if (ran <= chanceToGetCoin[req.user.level]) {
-      req.user.coin++
-      updateCSV()
-      res.json({
-        message: 'Congratulation, you got a coin!!!',
-        coin: req.user.coin
-      })
-    } else {
-      res.json({
-        message: 'Sorry, you got nothing.',
-        coin: req.user.coin
-      })
+router.get(
+  '/getCoin',
+  authenticateToken,
+  authenticateUser,
+  async (req, res) => {
+    ran = Math.random()
+    flag = false
+    try {
+      if (ran <= chanceToGetCoin[req.user.level]) {
+        try {
+          await poolConnect
+
+          const request = new sql.Request(pool)
+          request.input('Email', sql.VarChar(50), req.user.email)
+          const result = await request.query(`UPDATE [dbo].[User]
+                                            SET [Coin] = [Coin] + 1
+                                            WHERE [Email] = @Email`)
+          // Specify the email of the user to update
+
+          console.log(
+            `User with email ${req.user.email} coin incremented successfully`
+          )
+        } catch (err) {
+          console.error('Failed to connect to MSSQL server', err)
+        }
+        res.json({
+          message: 'Congratulation, you got a coin!!!',
+          coin: req.user.coin + 1
+        })
+      } else {
+        res.json({
+          message: 'Sorry, you got nothing.',
+          coin: req.user.coin
+        })
+      }
+    } catch (error) {
+      return res.sendStatus(400)
     }
-  } catch (error) {
-    return res.sendStatus(400)
   }
-})
+)
 
 /******************************
 level Up
 *******************************/
-router.get('/levelUp', authenticateToken, authenticateUser, (req, res) => {
-  if (req.user.level >= 5)
-    return res.json({
-      message: 'You have reached the max level',
+router.get(
+  '/levelUp',
+  authenticateToken,
+  authenticateUser,
+  async (req, res) => {
+    if (req.user.level >= 5)
+      return res.json({
+        message: 'You have reached the max level',
+        level: req.user.level
+      })
+    if (req.user.coin < coinsToLevelUp[req.user.level])
+      return res.json({
+        message: 'Sorry, you do not have enough coins to level up',
+        level: req.user.level
+      })
+
+    try {
+      await poolConnect
+
+      const request = new sql.Request(pool)
+
+      // Update user's coin and level
+
+      request.input('CoinsToLevelUp', sql.Int, coinsToLevelUp[req.user.level]) // Specify the coins to level up
+      request.input('Email', sql.VarChar(50), req.user.email) // Specify the email of the user to update
+      const result = await request.query(`UPDATE [dbo].[User]
+                                          SET [Coin] = [Coin] - @CoinsToLevelUp,
+                                              [Level] = [Level] + 1
+                                          WHERE [Email] = @Email`)
+
+      console.log(
+        `User with email ${req.user.email} coin and level updated successfully`
+      )
+    } catch (err) {
+      console.error('Failed to connect to MSSQL server', err)
+    }
+    req.user.level++
+    res.json({
+      message: `Congratulation, you reached level ${req.user.level}!!!`,
       level: req.user.level
     })
-  if (req.user.coin < coinsToLevelUp[req.user.level])
-    return res.json({
-      message: 'Sorry, you do not have enough coins to level up',
-      level: req.user.level
-    })
-  req.user.coin -= coinsToLevelUp[req.user.level]
-  req.user.level++
-  updateCSV()
-  res.json({
-    message: `Congratulation, you reached level ${req.user.level}!!!`,
-    level: req.user.level
-  })
-})
+  }
+)
 
 /******************************
 Change nickname
@@ -516,12 +661,28 @@ router.post(
   '/changeNickname',
   authenticateToken,
   authenticateUser,
-  (req, res) => {
+  async (req, res) => {
     const { nickname } = req.body
-    req.user.nickname = nickname
-    updateCSV()
+    try {
+      await poolConnect
+
+      const request = new sql.Request(pool)
+
+      // Update user's nickname
+
+      request.input('Nickname', sql.VarChar(50), nickname) // Specify the new nickname
+      request.input('Email', sql.VarChar(50), req.user.email) // Specify the email of the user to update
+      await request.query(`UPDATE [dbo].[User]
+                                          SET [Nickname] = @Nickname
+                                          WHERE [Email] = @Email`)
+      console.log(
+        `User with email ${req.user.email} nickname updated successfully`
+      )
+    } catch (err) {
+      console.error('Failed to connect to MSSQL server', err)
+    }
     res.json({
-      message: `Your nickname have been changed to "${req.user.nickname}"`
+      message: `Your nickname have been changed to "${nickname}"`
     })
   }
 )
@@ -529,27 +690,33 @@ router.post(
 /******************************
 Get leaderboard
 *******************************/
-router.get('/leaderboard', authenticateToken, authenticateUser, (req, res) => {
-  const sortedList = userList.slice().sort((a, b) => {
-    if (a.level === b.level) {
-      return b.coin - a.coin
-    } else {
-      return b.level - a.level
-    }
-  })
-  const leaderboard = sortedList.slice(0, 10).map(user => ({
-    rank: sortedList.findIndex(u => u === user) + 1,
-    nickname: user.nickname,
-    level: user.level,
-    coin: user.coin
-  }))
+router.get(
+  '/leaderboard',
+  authenticateToken,
+  authenticateUser,
+  async (req, res) => {
+    await poolConnect
+    const request = new sql.Request(pool)
+    const result = await request.query(
+      `SELECT TOP 10 *
+        FROM [dbo].[User]
+        ORDER BY [Level] DESC, [Coin] DESC`
+    )
+    let top10 = result.recordset.slice(0, 10)
+    const leaderboard = top10.map(user => ({
+      rank: top10.findIndex(u => u === user) + 1,
+      nickname: user.nickname,
+      level: user.level,
+      coin: user.coin
+    }))
 
-  const rank = sortedList.findIndex(user => user.email === req.user.email) + 1
-  res.json({
-    leaderboard: leaderboard,
-    rank: rank
-  })
-})
+    const rank = result.recordset.findIndex(u => u.email === req.user.email) + 1
+    res.json({
+      leaderboard: leaderboard,
+      rank: rank
+    })
+  }
+)
 
 router.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
@@ -577,8 +744,8 @@ const authenticateTokenForSocket = (socket, next) => {
 }
 
 // Middleware function to authenticate the user
-const authenticateUserForSocket = (socket, next) => {
-  const user = userList.find(u => u.email === socket.user.email)
+const authenticateUserForSocket = async (socket, next) => {
+  const user = await getUserByEmail(socket.user.email)
 
   if (socket.user.state !== 'verified' || !user) {
     return next(

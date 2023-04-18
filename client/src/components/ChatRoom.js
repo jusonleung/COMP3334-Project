@@ -6,7 +6,13 @@ const ChatRoom = ({ socket }) => {
 
   useEffect(() => {
     socket.on('messageResponse', data => {
-      setMessages(messages => [...messages, data])
+      setMessages(messages => {
+        // Add the new data to the beginning of the array
+        const updatedMessages = [...messages, data]
+        // Limit the length of the array to 6
+        if (updatedMessages.length > 6) updatedMessages.shift()
+        return updatedMessages
+      })
     })
 
     return () => {
@@ -14,8 +20,8 @@ const ChatRoom = ({ socket }) => {
     }
   }, [socket])
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = e => {
+    e.preventDefault()
     if (message) {
       socket.emit('message', `${message}`)
       setMessage('')

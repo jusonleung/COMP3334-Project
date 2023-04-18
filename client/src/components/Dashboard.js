@@ -73,7 +73,7 @@ const Dashboard = () => {
             <Space>
               <div>
                 Use {coinsToLevelUp[level]} coins to level up, and you can get
-                coins with a {chanceToGetCoin[level + 1] * 100}% chance.
+                coins with a {chanceToGetCoin[level] * 100}% chance.
               </div>
               <Button onClick={levelUp}>Level Up</Button>
             </Space>

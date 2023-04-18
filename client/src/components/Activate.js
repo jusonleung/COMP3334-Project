@@ -5,7 +5,7 @@ const Activate = () => {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
   const navigate = useNavigate()
-  const gotoDashboardPage = () => navigate(configData.PATH.DASHBOARD)
+  const gotoLoginPage = () => navigate(configData.PATH.LOGIN)
 
     fetch(configData.SERVER_URL + configData.PATH.ACTIVATE, {
       method: 'GET',
@@ -20,8 +20,7 @@ const Activate = () => {
           alert(data.error_message)
         } else {
           alert(data.message)
-          localStorage.setItem('token', data.token)
-          gotoDashboardPage()
+          gotoLoginPage()
         }
       })
       .catch(err => console.error(err))
