@@ -21,7 +21,7 @@ const server = https.createServer(options, app)
 
 const io = require('socket.io')(server, {
   cors: {
-    origin: 'http://localhost:3000'
+    origin: process.env.CLIENT_URL
   }
 })
 const PORT = 4000
@@ -32,6 +32,7 @@ const SECRET_KEY =
 const novu = new Novu(process.env.NOVU_API_KEY)
 const chanceToGetCoin = [0.1, 0.15, 0.25, 0.4, 0.65, 1]
 const coinsToLevelUp = [5, 10, 30, 80, 200]
+const novu_enable = false
 
 //Create a MSSQL connection pool
 const pool = new sql.ConnectionPool({
@@ -126,7 +127,8 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, SECRET_KEY, (err, user) => {
     if (err) {
       console.log(err)
-      return res.sendStatus(401).json(err)}
+      return res.sendStatus(401).json(err)
+    }
     req.user = user
     next()
   })
@@ -221,20 +223,21 @@ const sendActivationEmail = async (email, locked) => {
   try {
     console.log(email)
     const token = generateToken(email, 'activate')
-    let response = await novu.trigger('activation-email', {
-      to: {
-        subscriberId: email,
-        email: email
-      },
-      payload: {
-        action: locked ? 'unlock' : 'activate',
-        link: `http://localhost:3000/activate?token=${token}`
-      }
-    })
+    if (novu_enable)
+      await novu.trigger('activation-email', {
+        to: {
+          subscriberId: email,
+          email: email
+        },
+        payload: {
+          action: locked ? 'unlock' : 'activate',
+          link: `${process.env.CLIENT_URL}/activate?token=${token}`
+        }
+      })
     console.log(
       `To ${email}: Click this link to ${
         locked ? 'unlock' : 'activate'
-      } your email\nhttp://localhost:3000/activate?token=${token}`
+      } your email\n${process.env.CLIENT_URL}/activate?token=${token}`
     )
     //console.log(response)
   } catch (err) {
@@ -292,7 +295,9 @@ router.post('/login', async (req, res) => {
       await request.query(`UPDATE [dbo].[User]
                            SET [invalidAttempt] = @invalidAttempt
                            WHERE [Email] = @Email`)
-      console.log(`User with email ${email} invalidAttempt updated successfully`)
+      console.log(
+        `User with email ${email} invalidAttempt updated successfully`
+      )
     } catch (err) {
       console.error('Failed to connect to MSSQL server', err)
     }
@@ -369,15 +374,16 @@ const sendOTP = async email => {
   try {
     OTPs = OTPs.filter(otp => otp.email !== email)
     const OTP = generateRandomNumber()
-    let response = await novu.trigger('OTP', {
-      to: {
-        subscriberId: email,
-        email: email
-      },
-      payload: {
-        OTP: OTP
-      }
-    })
+    if (novu_enable)
+      await novu.trigger('OTP', {
+        to: {
+          subscriberId: email,
+          email: email
+        },
+        payload: {
+          OTP: OTP
+        }
+      })
     console.log(`To ${email}: Your verification code is ${OTP}`)
     const newOTP = {
       email: email,
@@ -441,7 +447,7 @@ router.post('/login/2fa', authenticateToken, async (req, res) => {
   })
 })
 
-const changePassword = async ( email, newPassword ) => {
+const changePassword = async (email, newPassword) => {
   try {
     //console.log(email)
     await poolConnect
@@ -518,15 +524,16 @@ router.post('/forgetPw', async (req, res) => {
 const sendPwResetEmail = async email => {
   try {
     const token = generateToken(email, 'resetPw')
-    let response = await novu.trigger('reset-password-email', {
-      to: {
-        subscriberId: email,
-        email: email
-      },
-      payload: {
-        link: `http://localhost:3000/resetpw?token=${token}`
-      }
-    })
+    if (novu_enable)
+      await novu.trigger('reset-password-email', {
+        to: {
+          subscriberId: email,
+          email: email
+        },
+        payload: {
+          link: `http://localhost:3000/resetpw?token=${token}`
+        }
+      })
     console.log(
       `To ${email}: Click this link to reset your password\nhttp://localhost:3000/resetpw?token=${token}`
     )
@@ -720,8 +727,6 @@ router.get(
 
 router.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
-app.use('/api', router)
-
 /******************************
 Web socket for chatroom
 *******************************/
@@ -761,15 +766,15 @@ io.use(authenticateTokenForSocket)
 io.use(authenticateUserForSocket)
 
 io.on('connection', socket => {
-  //console.log(`${socket.user.email} connected`)
+  console.log(`${socket.user.email} connected`)
 
   socket.on('message', data => {
-    console.log(`${socket.user.nickname}(${socket.user.email}): ${data}`)
     io.emit('messageResponse', `${socket.user.nickname}: ${data}`)
+    console.log(`${socket.user.nickname}(${socket.user.email}) said: ${data}`)
   })
 
   socket.on('disconnect', () => {
-    //console.log(`${socket.user.email} disconnected`)
+    console.log(`${socket.user.email} disconnected`)
   })
 })
 

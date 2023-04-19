@@ -19,7 +19,7 @@ const Dashboard = () => {
   const chanceToGetCoin = configData.CHANCETOGETCOIN
   const coinsToLevelUp = configData.COINSTOLEVELUP
 
-  const socket = io('https://localhost:4000', {
+  const socket = io(configData.SERVER_URL, {
     secure: true,
     rejectUnauthorized: false,
     transportOptions: {
