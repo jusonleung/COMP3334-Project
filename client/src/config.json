@@ -1,5 +1,5 @@
 {
-    "SERVER_URL": "https://windpowerrpi.arlab1.cc:14637",
+    "SERVER_URL": "https://localhost:4000",
     "PATH":{
         "LOGIN": "/login",
         "REGISTER": "/register",
