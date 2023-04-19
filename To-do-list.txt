@@ -1,2 +1,0 @@
-two-factor authentication using email (done)
-Setting a maximum number of login attempts, can be reactivate with email
