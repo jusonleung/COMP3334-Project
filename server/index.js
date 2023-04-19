@@ -13,15 +13,17 @@ const { Novu } = require('@novu/node')
 const jwt = require('jsonwebtoken')
 const sql = require('mssql/msnodesqlv8')
 
-const options = {
-  key: fs.readFileSync('key'),
-  cert: fs.readFileSync('cert')
-}
-const server = https.createServer(options, app)
+const server = https.createServer(
+  {
+    key: fs.readFileSync('key'),
+    cert: fs.readFileSync('cert')
+  },
+  app
+)
 
 const io = require('socket.io')(server, {
   cors: {
-    origin: process.env.CLIENT_URL
+    origin: [process.env.CLIENT_URL, 'http://localhost:3000']
   }
 })
 const PORT = 4000
@@ -48,7 +50,7 @@ const pool = new sql.ConnectionPool({
 const pool = new sql.ConnectionPool({
   user:process.env.DB_USER,
   password:process.env.DB_PASSWORD,
-  server:process.env.DB_SERVER,   //這邊要注意一下!!
+  server:process.env.DB_SERVER,
   database:process.env.DB_DATABASE
 }) */
 
@@ -761,6 +763,8 @@ const authenticateUserForSocket = async (socket, next) => {
   socket.user = user
   next()
 }
+
+app.use(router)
 
 io.use(authenticateTokenForSocket)
 io.use(authenticateUserForSocket)

@@ -108,7 +108,7 @@ const Login = () => {
         </Form>
       )}
       {show2faForm && (
-        <TwoFA API='/login' navigateTo={configData.PATH.DASHBOARD} />
+        <TwoFA API={configData.PATH.LOGIN} navigateTo={configData.PATH.DASHBOARD} />
       )}
     </div>
   )
