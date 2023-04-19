@@ -124,7 +124,9 @@ const authenticateToken = (req, res, next) => {
   if (token == null) return res.sendStatus(401)
 
   jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(401).json(err)
+    if (err) {
+      console.log(err)
+      return res.sendStatus(401).json(err)}
     req.user = user
     next()
   })
@@ -302,7 +304,7 @@ router.post('/login', async (req, res) => {
 
         // Update user's lock status
 
-        request.input('Lock', sql.Bit, false) // Set Lock = false
+        request.input('Lock', sql.Bit, true) // Set Lock = false
         request.input('Email', sql.VarChar(50), email) // Specify the email of the user to update
         await request.query(`UPDATE [dbo].[User]
                              SET [Lock] = @Lock
@@ -347,10 +349,10 @@ router.get('/activate', authenticateToken, async (req, res) => {
     request.input('InvalidAttempt', sql.Int, 0) // Update InvalidAttempt to 0
     request.input('Email', sql.VarChar(50), req.user.email) // Specify the email of the user to update
     await request.query(`UPDATE [dbo].[User]
-                                          SET [Lock] = @Lock,
-                                              [Activate] = @Activate,
-                                              [InvalidAttempt] = @InvalidAttempt
-                                          WHERE [Email] = @Email`)
+                         SET [Lock] = @Lock,
+                         [Activate] = @Activate,
+                         [InvalidAttempt] = @InvalidAttempt
+                         WHERE [Email] = @Email`)
     console.log(`User with email ${req.user.email} updated successfully`)
   } catch (err) {
     console.error('Failed to connect to MSSQL server', err)
@@ -439,25 +441,26 @@ router.post('/login/2fa', authenticateToken, async (req, res) => {
   })
 })
 
-const changePassword = async ({ email, newPassword }) => {
+const changePassword = async ( email, newPassword ) => {
   try {
+    //console.log(email)
     await poolConnect
 
     // Generate random number for salt
     const salt = generateRandomNumber()
 
     // Hash password with salt
-    const password = hash(salt + newPassword)
+    const hashedPassword = hash(salt + newPassword)
 
     const request = new sql.Request(pool)
 
     request.input('Salt', sql.NChar(4), salt) // Update Salt with the generated random number
-    request.input('Password', sql.Char(64), newPassword) // Update Password with the hashed password
+    request.input('Password', sql.Char(64), hashedPassword) // Update Password with the hashed password
     request.input('Email', sql.VarChar(50), email) // Specify the email of the user to update
     await request.query(`UPDATE [dbo].[User]
-                                        SET [Salt] = @Salt,
-                                            [Password] = @Password
-                                        WHERE [Email] = @Email`)
+                         SET [Salt] = @Salt,
+                         [Password] = @Password
+                         WHERE [Email] = @Email`)
 
     console.log(`User with email ${email} updated successfully`)
   } catch (err) {
@@ -474,10 +477,9 @@ router.post(
   authenticateUser,
   async (req, res) => {
     const { oldPassword, newPassword } = req.body
-    let user = await getUserByEmail(req.user.email)
 
     //If wrong old password
-    if (hash(user.salt + oldPassword) !== user.password) {
+    if (hash(req.user.salt + oldPassword) !== req.user.password) {
       return res.status(400).json({
         error_message: 'Invalid old password'
       })
@@ -492,7 +494,7 @@ router.post(
     }
 
     //set new salt and password for user
-    changePassword(user.email, newPassword)
+    changePassword(req.user.email, newPassword)
 
     //Return sucessfull message
     res.json({
@@ -759,7 +761,7 @@ io.use(authenticateTokenForSocket)
 io.use(authenticateUserForSocket)
 
 io.on('connection', socket => {
-  console.log(`${socket.user.email} connected`)
+  //console.log(`${socket.user.email} connected`)
 
   socket.on('message', data => {
     console.log(`${socket.user.nickname}(${socket.user.email}): ${data}`)
@@ -767,7 +769,7 @@ io.on('connection', socket => {
   })
 
   socket.on('disconnect', () => {
-    console.log(`${socket.user.email} disconnected`)
+    //console.log(`${socket.user.email} disconnected`)
   })
 })
 
