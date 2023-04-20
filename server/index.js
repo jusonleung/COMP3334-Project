@@ -23,7 +23,7 @@ const server = https.createServer(
 
 const io = require('socket.io')(server, {
   cors: {
-    origin: [process.env.CLIENT_URL, 'http://localhost:3000']
+    origin: process.env.CLIENT_URL
   }
 })
 const PORT = 4000
@@ -34,9 +34,9 @@ const SECRET_KEY =
 const novu = new Novu(process.env.NOVU_API_KEY)
 const chanceToGetCoin = [0.1, 0.15, 0.25, 0.4, 0.65, 1]
 const coinsToLevelUp = [5, 10, 30, 80, 200]
-const novu_enable = false
+const novu_enable = true
 
-//Create a MSSQL connection pool
+/* //Create a MSSQL connection pool
 const pool = new sql.ConnectionPool({
   database: 'COMP3334',
   server: 'localhost',
@@ -44,15 +44,15 @@ const pool = new sql.ConnectionPool({
   options: {
     trustedConnection: true
   }
-})
+}) */
 
-/* //Create a MSSQL connection pool
+//Create a MSSQL connection pool
 const pool = new sql.ConnectionPool({
   user:process.env.DB_USER,
   password:process.env.DB_PASSWORD,
   server:process.env.DB_SERVER,
   database:process.env.DB_DATABASE
-}) */
+})
 
 const poolConnect = pool.connect()
 poolConnect
@@ -401,14 +401,10 @@ const sendOTP = async email => {
 
 // Function to check and remove expired OTPs
 const checkExpiredOTPs = () => {
-  const currentTime = Date.now()
-  for (let i = OTPs.length - 1; i >= 0; i--) {
-    const { expireTime } = OTPs[i]
-    if (expireTime < currentTime) {
-      OTPs.splice(i, 1)
-    }
-  }
+  const tenMinutesAgo = Date.now() - (10 * 60 * 1000); // 10 minutes in milliseconds
+  OTPs = OTPs.filter(otp => otp.expireTime >= tenMinutesAgo);
 }
+
 
 // Call checkExpiredOTPs every 3 minutes
 setInterval(checkExpiredOTPs, 3 * 60 * 1000)
